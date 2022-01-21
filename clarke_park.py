@@ -1,3 +1,7 @@
+"""This file is meant to be used as an educational and exploratory tool.
+
+Please modify it as needed to better understand Clarke & Park transforms.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
@@ -5,463 +9,435 @@ from enum import IntEnum
 
 
 class ParkAlignment(IntEnum):
+    """This enumerates the two park transform reference options.
+
+    Args:
+        IntEnum: The enumeration value
+    """
+
     q_aligned = 1
     d_aligned = 2
 
 
-####################################################################
-# configuration constants
-frequency = 1
-duration = 1
-sample_rate = 100
-sample_count = duration * sample_rate
-park_alignment = ParkAlignment.d_aligned
+class PhaseIndex(IntEnum):
+    """Enumerates indices in three phase data matrix.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
+    Phase1 = 0
+    Phase2 = 1
+    Phase3 = 2
 
 
-####################################################################
-# calculated constants
-_2pi = 2 * np.pi
-_120 = (1 / 3) * _2pi
-phase_offset_1 = _120 * (0)
-phase_offset_2 = _120 * (1)
-phase_offset_3 = _120 * (2)
+class ClarkeIndex(IntEnum):
+    """Enumerates indices in three clarke transform data matrix.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
+    Alpha = 0
+    Beta = 1
+    Zero = 2
 
 
-####################################################################
-# three phase data
-time_array = np.linspace(0, 1, sample_count)
-phase1_data_array = frequency * 2 * np.pi * time_array + phase_offset_1
-phase2_data_array = frequency * 2 * np.pi * time_array + phase_offset_2
-phase3_data_array = frequency * 2 * np.pi * time_array + phase_offset_3
-phase1_instantaneous = phase1_data_array[0]
-phase2_instantaneous = phase2_data_array[0]
-phase3_instantaneous = phase3_data_array[0]
-three_phase_data_matrix = np.array(
-    [
-        np.cos(phase1_data_array),
-        np.cos(phase2_data_array),
-        np.cos(phase3_data_array),
-    ]
-)
-instantaneous_three_phase_data_vector = np.array(
-    [
-        np.cos(phase1_data_array[0]),
-        np.cos(phase2_data_array[0]),
-        np.cos(phase3_data_array[0]),
-    ]
-)
+class ParkIndex(IntEnum):
+    """Enumerates indices in park transform data matrix.
 
-####################################################################
-# Clarke transform
-clarke_matrix = (2 / 3) * np.array(
-    [
-        [1, -(1 / 2), -(1 / 2)],
-        [0, (np.sqrt(3) / 2), -(np.sqrt(3) / 2)],
-        [(1 / 2), (1 / 2), (1 / 2)],
-    ]
-)
-# single-value'd Clarke transform on 0'th index of three-phase data
-clarke_alpha_beta_zero_instantaneous = np.dot(
-    clarke_matrix,
-    instantaneous_three_phase_data_vector,
-)
-# assign outputs to individual variables as well
-(
-    clarke_alpha_instantaneous,
-    clarke_beta_instantaneous,
-    clarke_zero_instantaneous,
-) = clarke_alpha_beta_zero_instantaneous
-# Clarke transform along axis
-clarke_alpha_beta_zero_array = np.dot(
-    clarke_matrix,
-    three_phase_data_matrix,
-)
-# assign outputs to individual variables as well
-(
-    clarke_alpha_array,
-    clarke_beta_array,
-    clarke_zero_array,
-) = clarke_alpha_beta_zero_array
+    Args:
+        IntEnum: enumeration value
+    """
 
-####################################################################
-# Park transform
-# create theta array
-park_theta_array = phase1_data_array.copy()
-park_theta_instantaneous = park_theta_array[0]
-# create park transformation matrix
-# assign outputs to individual variables as well
-park_matrix = np.zeros([0])
-if park_alignment == ParkAlignment.q_aligned:
-    park_matrix = np.array(
-        [
+    D = 0
+    Q = 1
+    Zero = 2
+
+
+class ClarkeParkDemo:
+    """Container class for doing Clarke and Park Transforms."""
+
+    def __init__(self) -> None:
+        """This is a container class meant to allow cleaner calculation code."""
+        # configuration constants
+        self.frequency = 1
+        self.duration = 1
+        self.sample_rate = 100
+        self.sample_count = self.duration * self.sample_rate
+        self.park_alignment = ParkAlignment.d_aligned
+
+        # calculated constants
+        self._2pi = 2 * np.pi
+        self._120 = (1 / 3) * self._2pi
+        self.phase_offset_1 = self._120 * (0)
+        self.phase_offset_2 = self._120 * (1)
+        self.phase_offset_3 = self._120 * (2)
+
+        # run functions
+        self.do_three_phase_time_domain_data()
+        self.do_clarke_transform()
+        self.do_park_transform()
+
+        # plot data
+        self.pyplot_initial_plot()
+
+        # register gui callbacks
+        self.rotation_slider.on_changed(lambda x: self.pyplot_update_plots(x))
+
+        # interact!
+        plt.show()
+
+    def do_three_phase_time_domain_data(self):
+        """Create three phases of sinusoidal time-domain data."""
+        # time array
+        self.time_array = np.linspace(0, self.duration, self.sample_count)
+        # create three sine waves0
+        self.three_phase_data_matrix = np.array(
             [
-                np.sin(park_theta_array),
-                -np.cos(park_theta_array),
-                np.zeros((sample_count)),
-            ],
-            [
-                np.cos(park_theta_array),
-                np.sin(park_theta_array),
-                np.zeros((sample_count)),
-            ],
-            [
-                np.zeros((sample_count)),
-                np.zeros((sample_count)),
-                np.ones((sample_count)),
-            ],
-        ]
-    )
-elif park_alignment == ParkAlignment.d_aligned:
-    park_matrix = np.array(
-        [
-            [
-                np.sin(park_theta_array),
-                np.cos(park_theta_array),
-                np.zeros((sample_count)),
-            ],
-            [
-                np.cos(park_theta_array),
-                -np.sin(park_theta_array),
-                np.zeros((sample_count)),
-            ],
-            [
-                np.zeros((sample_count)),
-                np.zeros((sample_count)),
-                np.ones((sample_count)),
-            ],
-        ]
-    )
-
-park_array = np.einsum(
-    "ijk,ik->jk",
-    park_matrix,
-    clarke_alpha_beta_zero_array,
-)
-(
-    park_d_instantaneous,
-    park_q_instantaneous,
-    park_zero_instantaneous,
-) = park_array[:, 0]
-park_d_instantaneous_angle = 0.0
-park_q_instantaneous_angle = 0.0
-if park_alignment == ParkAlignment.q_aligned:
-    park_q_instantaneous_angle = phase1_instantaneous
-    park_d_instantaneous_angle = phase1_instantaneous - np.pi / 2
-else:
-    park_d_instantaneous_angle = phase1_instantaneous
-    park_q_instantaneous_angle = phase1_instantaneous + np.pi / 2
-if park_d_instantaneous < 0:
-    park_d_instantaneous *= -1
-    park_d_instantaneous_angle += np.pi
-if park_q_instantaneous < 0:
-    park_q_instantaneous *= -1
-    park_q_instantaneous_angle += np.pi
-
-(
-    park_d_array,
-    park_q_array,
-    park_zero_array,
-) = park_array
-####################################################################
-# plot setup
-# create figure
-figure = plt.figure()
-# add axes to figure
-axes = [
-    figure.add_subplot(1, 2, 1),
-    figure.add_subplot(1, 2, 2, polar=True),
-]
-# make room for controls
-plt.subplots_adjust(left=0.15, bottom=0.25)
-axes_rotation = plt.axes([0.25, 0.1, 0.65, 0.03])
-rotation_slider = Slider(
-    ax=axes_rotation,
-    label="Rotation (Rad)",
-    valmin=0,
-    valmax=1,
-    valinit=phase_offset_1,
-)
-# plot cartesian data
-reference_phase_line_plot = axes[0].plot(
-    time_array,
-    np.cos(phase1_data_array),
-    color="black",
-    linewidth=15,
-    alpha=0.15,
-)[0]
-phase1_line_plot = axes[0].plot(
-    time_array,
-    np.cos(phase1_data_array),
-)[0]
-phase2_line_plot = axes[0].plot(
-    time_array,
-    np.cos(phase2_data_array),
-)[0]
-phase3_line_plot = axes[0].plot(
-    time_array,
-    np.cos(phase3_data_array),
-)[0]
-clarke_alpha_line_plot = axes[0].plot(
-    time_array,
-    clarke_alpha_array,
-    "--",
-    linewidth=4,
-)[0]
-clarke_beta_line_plot = axes[0].plot(
-    time_array,
-    clarke_beta_array,
-    "--",
-    linewidth=4,
-)[0]
-park_d_line_plot = axes[0].plot(
-    time_array,
-    park_d_array,
-    ":",
-    linewidth=4,
-)[0]
-park_q_line_plot = axes[0].plot(
-    time_array,
-    park_q_array,
-    ":",
-    linewidth=4,
-)[0]
-axes[0].legend(
-    [
-        "Ref",
-        "Phase 1",
-        "Phase2",
-        "Phase 3",
-        "Clarke α",
-        "Clarke β",
-        "Park d",
-        "Park q",
-    ],
-    loc="upper right",
-)
-# plot polar data
-radii = np.array([0, 1])
-reference_angle_polar_plot = axes[1].plot(
-    [phase1_instantaneous, phase1_instantaneous],
-    radii,
-    color="black",
-    linewidth=15,
-    alpha=0.15,
-)[0]
-phase1_polar_plot = axes[1].plot(
-    [phase1_instantaneous, phase1_instantaneous],
-    radii,
-)[0]
-phase2_polar_plot = axes[1].plot(
-    [phase2_instantaneous, phase2_instantaneous],
-    radii,
-)[0]
-phase3_polar_plot = axes[1].plot(
-    [phase3_instantaneous, phase3_instantaneous],
-    radii,
-)[0]
-clarke_alpha_polar_plot = axes[1].plot(
-    [0, 0],
-    [0, clarke_alpha_instantaneous],
-    "--",
-    linewidth=4,
-)[0]
-clarke_beta_polar_plot = axes[1].plot(
-    [(np.pi / 2), (np.pi / 2)],
-    [0, clarke_beta_instantaneous],
-    "--",
-    linewidth=4,
-)[0]
-park_d_polar_plot = axes[1].plot(
-    [park_d_instantaneous_angle, park_d_instantaneous_angle],
-    [0, park_d_instantaneous],
-    ":",
-    linewidth=4,
-)[0]
-park_q_polar_plot = axes[1].plot(
-    [park_q_instantaneous_angle, park_q_instantaneous_angle],
-    [0, park_q_instantaneous],
-    ":",
-    linewidth=4,
-)[0]
-axes[1].legend(
-    [
-        "Ref",
-        "Phase 1",
-        "Phase2",
-        "Phase 3",
-        "Clarke α",
-        "Clarke β",
-        "Park d",
-        "Park q",
-    ],
-    loc="upper right",
-)
-
-
-# callback function for updating graph data
-def update(val):
-    phase_offset_1 = rotation_slider.val * 2 * np.pi
-    phase_offset_2 = phase_offset_1 + ((2 * np.pi) * (1 / 3))
-    phase_offset_3 = phase_offset_2 + ((2 * np.pi) * (1 / 3))
-    # theta = phase_offset_1
-    if phase_offset_3 > (2 * np.pi):
-        phase_offset_3 -= 2 * np.pi
-    phase1_data_array = frequency * 2 * np.pi * time_array + phase_offset_1
-    phase2_data_array = frequency * 2 * np.pi * time_array + phase_offset_2
-    phase3_data_array = frequency * 2 * np.pi * time_array + phase_offset_3
-    three_phase_data_matrix = np.array(
-        [
-            np.cos(phase1_data_array),
-            np.cos(phase2_data_array),
-            np.cos(phase3_data_array),
-        ]
-    )
-    phase1_instantaneous = phase1_data_array[0]
-    phase2_instantaneous = phase2_data_array[0]
-    phase3_instantaneous = phase3_data_array[0]
-    instantaneous_three_phase_data_vector = np.array(
-        [
-            np.cos(phase1_instantaneous),
-            np.cos(phase2_instantaneous),
-            np.cos(phase3_instantaneous),
-        ]
-    )
-    clarke_alpha_beta_zero_instantaneous = np.dot(
-        clarke_matrix,
-        instantaneous_three_phase_data_vector,
-    )
-    # assign outputs to individual variables as well
-    (
-        clarke_alpha_instantaneous,
-        clarke_beta_instantaneous,
-        clarke_zero_instantaneous,
-    ) = clarke_alpha_beta_zero_instantaneous
-    # Clarke transform along axis
-    clarke_alpha_beta_zero_array = np.dot(
-        clarke_matrix,
-        three_phase_data_matrix,
-    )
-    # assign outputs to individual variables as well
-    (
-        clarke_alpha_array,
-        clarke_beta_array,
-        clarke_zero_array,
-    ) = clarke_alpha_beta_zero_array
-    park_theta_array = phase1_data_array.copy()
-    if park_alignment == ParkAlignment.q_aligned:
-        park_matrix = np.array(
-            [
-                [
-                    np.sin(park_theta_array),
-                    -np.cos(park_theta_array),
-                    np.zeros((sample_count)),
-                ],
-                [
-                    np.cos(park_theta_array),
-                    np.sin(park_theta_array),
-                    np.zeros((sample_count)),
-                ],
-                [
-                    np.zeros((sample_count)),
-                    np.zeros((sample_count)),
-                    np.ones((sample_count)),
-                ],
-            ]
-        )
-    elif park_alignment == ParkAlignment.d_aligned:
-        park_matrix = np.array(
-            [
-                [
-                    np.sin(park_theta_array),
-                    np.cos(park_theta_array),
-                    np.zeros((sample_count)),
-                ],
-                [
-                    np.cos(park_theta_array),
-                    -np.sin(park_theta_array),
-                    np.zeros((sample_count)),
-                ],
-                [
-                    np.zeros((sample_count)),
-                    np.zeros((sample_count)),
-                    np.ones((sample_count)),
-                ],
+                self.frequency * 2 * np.pi * self.time_array + self.phase_offset_1,
+                self.frequency * 2 * np.pi * self.time_array + self.phase_offset_2,
+                self.frequency * 2 * np.pi * self.time_array + self.phase_offset_3,
             ]
         )
 
-    park_array = np.einsum(
-        "ijk,ik->jk",
-        park_matrix,
-        clarke_alpha_beta_zero_array,
-    )
-    (
-        park_d_instantaneous,
-        park_q_instantaneous,
-        park_zero_instantaneous,
-    ) = park_array[:, 0]
-    park_d_instantaneous_angle = 0
-    park_q_instantaneous_angle = 0
-    if park_alignment == ParkAlignment.q_aligned:
-        park_q_instantaneous_angle = phase1_instantaneous
-        park_d_instantaneous_angle = phase1_instantaneous - np.pi / 2
-    else:
-        park_d_instantaneous_angle = phase1_instantaneous
-        park_q_instantaneous_angle = phase1_instantaneous + np.pi / 2
-    if park_d_instantaneous < 0:
-        park_d_instantaneous *= -1
-        park_d_instantaneous_angle += np.pi
-    if park_q_instantaneous < 0:
-        park_q_instantaneous *= -1
-        park_q_instantaneous_angle += np.pi
+    def do_clarke_transform(self):
+        """Perform Clarke transform function.
 
-    reference_phase_line_plot.set_ydata(np.cos(phase1_data_array))
-    phase1_line_plot.set_ydata(np.cos(phase1_data_array))
-    phase2_line_plot.set_ydata(np.cos(phase2_data_array))
-    phase3_line_plot.set_ydata(np.cos(phase3_data_array))
-    clarke_alpha_line_plot.set_ydata(clarke_alpha_array)
-    clarke_beta_line_plot.set_ydata(clarke_beta_array)
-    park_d_line_plot.set_ydata(park_d_array)
-    park_q_line_plot.set_ydata(park_q_array)
+        https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_transformation
+        https://www.mathworks.com/help/physmod/sps/ref/clarketransform.html
+        """
+        # Clarke transform
+        self.clarke_matrix = (2 / 3) * np.array(
+            [
+                [1, -(1 / 2), -(1 / 2)],
+                [0, (np.sqrt(3) / 2), -(np.sqrt(3) / 2)],
+                [(1 / 2), (1 / 2), (1 / 2)],
+            ]
+        )
+        # Clarke transform function
+        self.clarke_alpha_beta_zero_array = np.dot(
+            self.clarke_matrix,
+            np.cos(self.three_phase_data_matrix),
+        )
+        # assign outputs to individual variables for polar plots
+        (
+            self.clarke_alpha_instantaneous,
+            self.clarke_beta_instantaneous,
+            self.clarke_zero_instantaneous,
+        ) = self.clarke_alpha_beta_zero_array[:, 0]
+        # matplotlib likes positive vector lengths
+        if self.clarke_alpha_instantaneous >= 0:
+            self.clarke_alpha_instantaneous_angle = 0.0
+        else:
+            self.clarke_alpha_instantaneous_angle = np.pi
+            self.clarke_alpha_instantaneous *= -1
+        if self.clarke_beta_instantaneous >= 0:
+            self.clarke_beta_instantaneous_angle = np.pi * 3 / 2
+        else:
+            self.clarke_beta_instantaneous_angle = np.pi / 2
+            self.clarke_beta_instantaneous *= -1
 
-    reference_angle_polar_plot.set_xdata(phase1_instantaneous)
-    phase1_polar_plot.set_xdata(phase1_instantaneous)
-    phase2_polar_plot.set_xdata(phase2_instantaneous)
-    phase3_polar_plot.set_xdata(phase3_instantaneous)
-    # print(clarke_alpha_instantaneous)
-    if clarke_alpha_instantaneous >= 0:
-        clarke_alpha_polar_plot.set_xdata([0, 0])
-    else:
-        clarke_alpha_polar_plot.set_xdata([np.pi, np.pi])
-    clarke_alpha_polar_plot.set_ydata([0, np.abs(clarke_alpha_instantaneous)])
-    if clarke_beta_instantaneous >= 0:
-        clarke_beta_polar_plot.set_xdata([(np.pi * 3 / 2), (np.pi * 3 / 2)])
-    else:
-        clarke_beta_polar_plot.set_xdata([(np.pi / 2), (np.pi / 2)])
-    clarke_beta_polar_plot.set_ydata([0, np.abs(clarke_beta_instantaneous)])
-    park_d_polar_plot.set_xdata(
-        [park_d_instantaneous_angle, park_d_instantaneous_angle]
-    )
-    park_d_polar_plot.set_ydata(
-        [
-            0,
-            park_d_instantaneous,
+    def do_park_transform(self):
+        """Perform Park transform function.
+
+        https://de.wikipedia.org/wiki/D/q-Transformation
+        https://www.mathworks.com/help/physmod/sps/ref/clarketoparkangletransform.html
+        """
+        # create Park transformation matrix, with reference based on enum value
+        if self.park_alignment == ParkAlignment.q_aligned:
+            self.park_matrix = np.array(
+                [
+                    [
+                        np.sin(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        -np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        np.zeros((self.sample_count)),
+                    ],
+                    [
+                        np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        np.sin(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        np.zeros((self.sample_count)),
+                    ],
+                    [
+                        np.zeros((self.sample_count)),
+                        np.zeros((self.sample_count)),
+                        np.ones((self.sample_count)),
+                    ],
+                ]
+            )
+        elif self.park_alignment == ParkAlignment.d_aligned:
+            self.park_matrix = np.array(
+                [
+                    [
+                        np.sin(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        np.zeros((self.sample_count)),
+                    ],
+                    [
+                        np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        -np.sin(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+                        np.zeros((self.sample_count)),
+                    ],
+                    [
+                        np.zeros((self.sample_count)),
+                        np.zeros((self.sample_count)),
+                        np.ones((self.sample_count)),
+                    ],
+                ]
+            )
+        # perform the matrix math
+        self.park_array = np.einsum(
+            "ijk,ik->jk",
+            self.park_matrix,
+            self.clarke_alpha_beta_zero_array,
+        )
+        # save instantaneous values for polar plots
+        (
+            self.park_d_instantaneous,
+            self.park_q_instantaneous,
+            self.park_zero_instantaneous,
+        ) = self.park_array[:, 0]
+        # set the phase angle based on reference value
+        if self.park_alignment == ParkAlignment.q_aligned:
+            self.park_q_instantaneous_angle = self.three_phase_data_matrix[PhaseIndex.Phase1, 0]
+            self.park_d_instantaneous_angle = self.three_phase_data_matrix[PhaseIndex.Phase1, 0] - np.pi / 2
+        else:
+            self.park_d_instantaneous_angle = self.three_phase_data_matrix[PhaseIndex.Phase1, 0]
+            self.park_q_instantaneous_angle = self.three_phase_data_matrix[PhaseIndex.Phase1, 0] + np.pi / 2
+        # matplotlib likes positive vectors
+        if self.park_d_instantaneous < 0:
+            self.park_d_instantaneous *= -1
+            self.park_d_instantaneous_angle += 2 * np.pi
+        if self.park_q_instantaneous < 0:
+            self.park_q_instantaneous *= -1
+            self.park_q_instantaneous_angle += 2 * np.pi
+
+    def pyplot_initial_plot(self):
+        """Plot the data using matplotlib.pyplot."""
+        # create figure
+        self.figure = plt.figure()
+        # add axes to figure
+        self.axes = [
+            self.figure.add_subplot(1, 2, 1),
+            self.figure.add_subplot(1, 2, 2, polar=True),
         ]
-    )
-    park_q_polar_plot.set_xdata(
-        [
-            park_q_instantaneous_angle,
-            park_q_instantaneous_angle,
-        ]
-    )
-    park_q_polar_plot.set_ydata(
-        [
-            0,
-            park_q_instantaneous,
-        ]
-    )
-    figure.canvas.draw_idle()
+        # make room for controls
+        plt.subplots_adjust(left=0.15, bottom=0.25)
+        self.axes.append(plt.axes([0.25, 0.1, 0.65, 0.03]))
+        self.rotation_slider = Slider(
+            ax=self.axes[2],
+            label="Rotation (Rad)",
+            valmin=0,
+            valmax=1,
+            valinit=self.phase_offset_1,
+        )
+        # plot cartesian data
+        self.reference_phase_line_plot = self.axes[0].plot(
+            self.time_array,
+            np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+            color="black",
+            linewidth=15,
+            alpha=0.15,
+        )[0]
+        self.phase1_line_plot = self.axes[0].plot(
+            self.time_array,
+            np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]),
+        )[0]
+        self.phase2_line_plot = self.axes[0].plot(
+            self.time_array,
+            np.cos(self.three_phase_data_matrix[PhaseIndex.Phase2, :]),
+        )[0]
+        self.phase3_line_plot = self.axes[0].plot(
+            self.time_array,
+            np.cos(self.three_phase_data_matrix[PhaseIndex.Phase3, :]),
+        )[0]
+        self.clarke_alpha_line_plot = self.axes[0].plot(
+            self.time_array,
+            self.clarke_alpha_beta_zero_array[ClarkeIndex.Alpha, :],
+            "--",
+            linewidth=4,
+        )[0]
+        self.clarke_beta_line_plot = self.axes[0].plot(
+            self.time_array,
+            self.clarke_alpha_beta_zero_array[ClarkeIndex.Beta, :],
+            "--",
+            linewidth=4,
+        )[0]
+        self.park_d_line_plot = self.axes[0].plot(
+            self.time_array,
+            self.park_array[ParkIndex.D, :],
+            ":",
+            linewidth=4,
+        )[0]
+        self.park_q_line_plot = self.axes[0].plot(
+            self.time_array,
+            self.park_array[ParkIndex.Q, :],
+            ":",
+            linewidth=4,
+        )[0]
+        self.axes[0].legend(
+            [
+                "Ref",
+                "Phase 1",
+                "Phase2",
+                "Phase 3",
+                "Clarke α",
+                "Clarke β",
+                "Park d",
+                "Park q",
+            ],
+            loc="upper right",
+        )
+        # plot polar data
+        radii = np.array([0, 1])
+        self.reference_angle_polar_plot = self.axes[1].plot(
+            [
+                self.three_phase_data_matrix[PhaseIndex.Phase1, 0],
+                self.three_phase_data_matrix[PhaseIndex.Phase1, 0],
+            ],
+            radii,
+            color="black",
+            linewidth=15,
+            alpha=0.15,
+        )[0]
+        self.phase1_polar_plot = self.axes[1].plot(
+            [
+                self.three_phase_data_matrix[PhaseIndex.Phase1, 0],
+                self.three_phase_data_matrix[PhaseIndex.Phase1, 0],
+            ],
+            radii,
+        )[0]
+        self.phase2_polar_plot = self.axes[1].plot(
+            [
+                self.three_phase_data_matrix[PhaseIndex.Phase2, 0],
+                self.three_phase_data_matrix[PhaseIndex.Phase2, 0],
+            ],
+            radii,
+        )[0]
+        self.phase3_polar_plot = self.axes[1].plot(
+            [
+                self.three_phase_data_matrix[PhaseIndex.Phase3, 0],
+                self.three_phase_data_matrix[PhaseIndex.Phase3, 0],
+            ],
+            radii,
+        )[0]
+        self.clarke_alpha_polar_plot = self.axes[1].plot(
+            [0, 0],
+            [0, self.clarke_alpha_instantaneous],
+            "--",
+            linewidth=4,
+        )[0]
+        self.clarke_beta_polar_plot = self.axes[1].plot(
+            [(np.pi / 2), (np.pi / 2)],
+            [0, self.clarke_beta_instantaneous],
+            "--",
+            linewidth=4,
+        )[0]
+        self.park_d_polar_plot = self.axes[1].plot(
+            [self.park_d_instantaneous_angle, self.park_d_instantaneous_angle],
+            [0, self.park_d_instantaneous],
+            ":",
+            linewidth=4,
+        )[0]
+        self.park_q_polar_plot = self.axes[1].plot(
+            [self.park_q_instantaneous_angle, self.park_q_instantaneous_angle],
+            [0, self.park_q_instantaneous],
+            ":",
+            linewidth=4,
+        )[0]
+        self.axes[1].legend(
+            [
+                "Ref",
+                "Phase 1",
+                "Phase2",
+                "Phase 3",
+                "Clarke α",
+                "Clarke β",
+                "Park d",
+                "Park q",
+            ],
+            loc="upper right",
+        )
+        self.figure.canvas.set_window_title("Clarke & Park Transformation Demo")
+
+    def set_rotation_angle(self, phase_1_angle_radian: float):
+        """Set the rotation angle.
+
+        Args:
+            phase_1_angle_radian: a number
+        """
+        # update values with fixed 120 degree offsets
+        self.phase_offset_1 = phase_1_angle_radian * 2 * np.pi
+        self.phase_offset_2 = self.phase_offset_1 + ((2 * np.pi) * (1 / 3))
+        self.phase_offset_3 = self.phase_offset_2 + ((2 * np.pi) * (1 / 3))
+        # "force" angles between 0 and 2*pi
+        if self.phase_offset_1 < (2 * np.pi):
+            self.phase_offset_1 += 2 * np.pi
+        if self.phase_offset_2 > (2 * np.pi):
+            self.phase_offset_2 -= 2 * np.pi
+        elif self.phase_offset_2 < (2 * np.pi):
+            self.phase_offset_2 += 2 * np.pi
+        if self.phase_offset_3 > (2 * np.pi):
+            self.phase_offset_3 -= 2 * np.pi
+        elif self.phase_offset_3 < (2 * np.pi):
+            self.phase_offset_3 += 2 * np.pi
+
+    def pyplot_update_plots(self, val):
+        """Callback function for updating matplotlib.pyplot graph data.
+
+        Args:
+            val ([type]): [description]
+        """
+        # update things
+        self.set_rotation_angle(self.rotation_slider.val)
+        # do math
+        self.do_three_phase_time_domain_data()
+        self.do_clarke_transform()
+        self.do_park_transform()
+        # update cartesian plots
+        self.reference_phase_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]))
+        self.phase1_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]))
+        self.phase2_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase2, :]))
+        self.phase3_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase3, :]))
+        self.clarke_alpha_line_plot.set_ydata(self.clarke_alpha_beta_zero_array[ClarkeIndex.Alpha, :])
+        self.clarke_beta_line_plot.set_ydata(self.clarke_alpha_beta_zero_array[ClarkeIndex.Beta, :])
+        self.park_d_line_plot.set_ydata(self.park_array[ParkIndex.D, :])
+        self.park_q_line_plot.set_ydata(self.park_array[ParkIndex.Q, :])
+        # update polar plots
+        self.reference_angle_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase1, 0])
+        self.phase1_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase1, 0])
+        self.phase2_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase2, 0])
+        self.phase3_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase3, 0])
+        self.clarke_alpha_polar_plot.set_xdata(
+            [self.clarke_alpha_instantaneous_angle, self.clarke_alpha_instantaneous_angle]
+        )
+        self.clarke_alpha_polar_plot.set_ydata([0, self.clarke_alpha_instantaneous])
+        self.clarke_beta_polar_plot.set_xdata(
+            [self.clarke_beta_instantaneous_angle, self.clarke_beta_instantaneous_angle]
+        )
+        self.clarke_beta_polar_plot.set_ydata([0, self.clarke_beta_instantaneous])
+        self.park_d_polar_plot.set_xdata([self.park_d_instantaneous_angle, self.park_d_instantaneous_angle])
+        self.park_d_polar_plot.set_ydata(
+            [
+                0,
+                self.park_d_instantaneous,
+            ]
+        )
+        self.park_q_polar_plot.set_xdata(
+            [
+                self.park_q_instantaneous_angle,
+                self.park_q_instantaneous_angle,
+            ]
+        )
+        self.park_q_polar_plot.set_ydata(
+            [
+                0,
+                self.park_q_instantaneous,
+            ]
+        )
+        # redraw figure
+        self.figure.canvas.draw_idle()
 
 
-rotation_slider.on_changed(update)
-
-plt.show()
+if __name__ == "__main__":
+    ClarkeParkDemo()

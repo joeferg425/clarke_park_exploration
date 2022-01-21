@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {},
+	"launch": {
+		"configurations": [
+			{
+				"name": "Python: clarke_park",
+				"type": "python",
+				"request": "launch",
+				"program": "${workspaceFolder}/clarke_park.py",
+				"console": "integratedTerminal"
+			}
+		],
+		"compounds": []
+	}
+}

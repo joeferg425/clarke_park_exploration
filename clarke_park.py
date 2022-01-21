@@ -61,7 +61,12 @@ class ClarkeParkDemo:
     def __init__(self) -> None:
         """This is a container class meant to allow cleaner calculation code."""
         # configuration constants
-        self.frequency = 1
+        self.frequency1 = 1
+        self.frequency2 = 1
+        self.frequency3 = 1
+        self.amplitude1 = 1
+        self.amplitude2 = 1
+        self.amplitude3 = 1
         self.duration = 1
         self.sample_rate = 100
         self.sample_count = self.duration * self.sample_rate
@@ -82,12 +87,6 @@ class ClarkeParkDemo:
         # plot data
         self.pyplot_initial_plot()
 
-        # register gui callbacks
-        self.rotation_slider.on_changed(lambda x: self.pyplot_update_plots(x))
-
-        # interact!
-        plt.show()
-
     def do_three_phase_time_domain_data(self):
         """Create three phases of sinusoidal time-domain data."""
         # time array
@@ -95,9 +94,9 @@ class ClarkeParkDemo:
         # create three sine waves0
         self.three_phase_data_matrix = np.array(
             [
-                self.frequency * 2 * np.pi * self.time_array + self.phase_offset_1,
-                self.frequency * 2 * np.pi * self.time_array + self.phase_offset_2,
-                self.frequency * 2 * np.pi * self.time_array + self.phase_offset_3,
+                self.frequency1 * 2 * np.pi * self.time_array + self.phase_offset_1,
+                self.frequency2 * 2 * np.pi * self.time_array + self.phase_offset_2,
+                self.frequency3 * 2 * np.pi * self.time_array + self.phase_offset_3,
             ]
         )
 
@@ -118,7 +117,8 @@ class ClarkeParkDemo:
         # Clarke transform function
         self.clarke_alpha_beta_zero_array = np.dot(
             self.clarke_matrix,
-            np.cos(self.three_phase_data_matrix),
+            np.cos(self.three_phase_data_matrix)
+            * np.array([self.amplitude1, self.amplitude2, self.amplitude3])[:, None],
         )
         # assign outputs to individual variables for polar plots
         (
@@ -215,15 +215,22 @@ class ClarkeParkDemo:
     def pyplot_initial_plot(self):
         """Plot the data using matplotlib.pyplot."""
         # create figure
-        self.figure = plt.figure()
+        self.figurex = plt.figure(constrained_layout=True)
+        self.subplots = self.figurex.subfigures(2, 1)
+        self.figure1 = self.subplots[0]
+        self.figure2 = self.subplots[1]
         # add axes to figure
         self.axes = [
-            self.figure.add_subplot(1, 2, 1),
-            self.figure.add_subplot(1, 2, 2, polar=True),
+            self.figure1.add_subplot(1, 2, 1),
+            self.figure1.add_subplot(1, 2, 2, polar=True),
+            self.figure2.add_subplot(7, 1, 1),
+            self.figure2.add_subplot(7, 1, 2),
+            self.figure2.add_subplot(7, 1, 3),
+            self.figure2.add_subplot(7, 1, 4),
+            self.figure2.add_subplot(7, 1, 5),
+            self.figure2.add_subplot(7, 1, 6),
+            self.figure2.add_subplot(7, 1, 7),
         ]
-        # make room for controls
-        plt.subplots_adjust(left=0.15, bottom=0.25)
-        self.axes.append(plt.axes([0.25, 0.1, 0.65, 0.03]))
         self.rotation_slider = Slider(
             ax=self.axes[2],
             label="Rotation (Rad)",
@@ -231,6 +238,56 @@ class ClarkeParkDemo:
             valmax=1,
             valinit=self.phase_offset_1,
         )
+        # register gui callbacks
+        self.rotation_slider.on_changed(lambda x: self.pyplot_update_plots(x))
+        self.frequency1_slider = Slider(
+            ax=self.axes[3],
+            label="Phase1 Frequency (Hertz)",
+            valmin=self.frequency1 - 1,
+            valmax=self.frequency1 + 1,
+            valinit=self.frequency1,
+        )
+        self.frequency1_slider.on_changed(lambda x: self.pyplot_update_plots(x))
+        self.frequency2_slider = Slider(
+            ax=self.axes[4],
+            label="Phase2 Frequency (Hertz)",
+            valmin=self.frequency2 - 1,
+            valmax=self.frequency2 + 1,
+            valinit=self.frequency2,
+        )
+        self.frequency2_slider.on_changed(lambda x: self.pyplot_update_plots(x))
+        self.frequency3_slider = Slider(
+            ax=self.axes[5],
+            label="Phase3 Frequency (Hertz)",
+            valmin=self.frequency3 - 1,
+            valmax=self.frequency3 + 1,
+            valinit=self.frequency3,
+        )
+        self.frequency3_slider.on_changed(lambda x: self.pyplot_update_plots(x))
+        self.amplitude1_slider = Slider(
+            ax=self.axes[6],
+            label="Phase1 Amplitude",
+            valmin=0.5,
+            valmax=1.5,
+            valinit=1,
+        )
+        self.amplitude1_slider.on_changed(lambda x: self.pyplot_update_plots(x))
+        self.amplitude2_slider = Slider(
+            ax=self.axes[7],
+            label="Phase2 Amplitude",
+            valmin=0.5,
+            valmax=1.5,
+            valinit=1,
+        )
+        self.amplitude2_slider.on_changed(lambda x: self.pyplot_update_plots(x))
+        self.amplitude3_slider = Slider(
+            ax=self.axes[8],
+            label="Phase3 Amplitude",
+            valmin=0.5,
+            valmax=1.5,
+            valinit=1,
+        )
+        self.amplitude3_slider.on_changed(lambda x: self.pyplot_update_plots(x))
         # plot cartesian data
         self.reference_phase_line_plot = self.axes[0].plot(
             self.time_array,
@@ -279,7 +336,7 @@ class ClarkeParkDemo:
             [
                 "Ref",
                 "Phase 1",
-                "Phase2",
+                "Phase 2",
                 "Phase 3",
                 "Clarke α",
                 "Clarke β",
@@ -349,7 +406,7 @@ class ClarkeParkDemo:
             [
                 "Ref",
                 "Phase 1",
-                "Phase2",
+                "Phase 2",
                 "Phase 3",
                 "Clarke α",
                 "Clarke β",
@@ -358,7 +415,10 @@ class ClarkeParkDemo:
             ],
             loc="upper right",
         )
-        self.figure.canvas.set_window_title("Clarke & Park Transformation Demo")
+        # self.figurex.tight_layout()
+        self.figurex.canvas.set_window_title("Clarke & Park Transformation Demo")
+        # interact!
+        plt.show()
 
     def set_rotation_angle(self, phase_1_angle_radian: float):
         """Set the rotation angle.
@@ -382,6 +442,24 @@ class ClarkeParkDemo:
         elif self.phase_offset_3 < (2 * np.pi):
             self.phase_offset_3 += 2 * np.pi
 
+    def set_frequency1(self, frequency: float):
+        self.frequency1 = frequency
+
+    def set_frequency2(self, frequency: float):
+        self.frequency2 = frequency
+
+    def set_frequency3(self, frequency: float):
+        self.frequency3 = frequency
+
+    def set_amplitude1(self, amplitude: float):
+        self.amplitude1 = amplitude
+
+    def set_amplitude2(self, amplitude: float):
+        self.amplitude2 = amplitude
+
+    def set_amplitude3(self, amplitude: float):
+        self.amplitude3 = amplitude
+
     def pyplot_update_plots(self, val):
         """Callback function for updating matplotlib.pyplot graph data.
 
@@ -390,21 +468,36 @@ class ClarkeParkDemo:
         """
         # update things
         self.set_rotation_angle(self.rotation_slider.val)
+        self.set_frequency1(self.frequency1_slider.val)
+        self.set_frequency2(self.frequency2_slider.val)
+        self.set_frequency3(self.frequency3_slider.val)
+        self.set_amplitude1(self.amplitude1_slider.val)
+        self.set_amplitude2(self.amplitude2_slider.val)
+        self.set_amplitude3(self.amplitude3_slider.val)
         # do math
         self.do_three_phase_time_domain_data()
         self.do_clarke_transform()
         self.do_park_transform()
         # update cartesian plots
-        self.reference_phase_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]))
-        self.phase1_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :]))
-        self.phase2_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase2, :]))
-        self.phase3_line_plot.set_ydata(np.cos(self.three_phase_data_matrix[PhaseIndex.Phase3, :]))
+        self.reference_phase_line_plot.set_ydata(
+            self.amplitude1 * np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :])
+        )
+        self.phase1_line_plot.set_ydata(
+            self.amplitude1 * np.cos(self.three_phase_data_matrix[PhaseIndex.Phase1, :])
+        )
+        self.phase2_line_plot.set_ydata(
+            self.amplitude2 * np.cos(self.three_phase_data_matrix[PhaseIndex.Phase2, :])
+        )
+        self.phase3_line_plot.set_ydata(
+            self.amplitude3 * np.cos(self.three_phase_data_matrix[PhaseIndex.Phase3, :])
+        )
         self.clarke_alpha_line_plot.set_ydata(self.clarke_alpha_beta_zero_array[ClarkeIndex.Alpha, :])
         self.clarke_beta_line_plot.set_ydata(self.clarke_alpha_beta_zero_array[ClarkeIndex.Beta, :])
         self.park_d_line_plot.set_ydata(self.park_array[ParkIndex.D, :])
         self.park_q_line_plot.set_ydata(self.park_array[ParkIndex.Q, :])
         # update polar plots
         self.reference_angle_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase1, 0])
+        self.reference_angle_polar_plot.set_ydata([0, self.clarke_alpha_instantaneous])
         self.phase1_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase1, 0])
         self.phase2_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase2, 0])
         self.phase3_polar_plot.set_xdata(self.three_phase_data_matrix[PhaseIndex.Phase3, 0])
@@ -436,7 +529,7 @@ class ClarkeParkDemo:
             ]
         )
         # redraw figure
-        self.figure.canvas.draw_idle()
+        self.figure1.canvas.draw_idle()
 
 
 if __name__ == "__main__":

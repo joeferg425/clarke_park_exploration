@@ -415,7 +415,6 @@ class ClarkeParkDemo:
             ],
             loc="upper right",
         )
-        # self.figurex.tight_layout()
         self.figurex.canvas.set_window_title("Clarke & Park Transformation Demo")
         # interact!
         plt.show()

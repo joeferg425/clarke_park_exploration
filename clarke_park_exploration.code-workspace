@@ -8,10 +8,17 @@
 	"launch": {
 		"configurations": [
 			{
-				"name": "Python: clarke_park",
+				"name": "Python: Clarke/Park 2D",
 				"type": "python",
 				"request": "launch",
 				"program": "${workspaceFolder}/clarke_park.py",
+				"console": "integratedTerminal"
+			},
+			{
+				"name": "Python: Current File",
+				"type": "python",
+				"request": "launch",
+				"program": "${file}",
 				"console": "integratedTerminal"
 			}
 		],

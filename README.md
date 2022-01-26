@@ -9,7 +9,13 @@ This repository is meant to hold example code for interacting with these equatio
 For example, run:
 
 ```bash
-python clarke_park.py
+python clarke_park_2d.py
 ```
 
-![clarke_park.py graph](images/clarke_park.png)
+![clarke_park_2d.py graph](images/clarke_park_2d.png)
+
+```bash
+python clarke_park_3d.py
+```
+
+![clarke_park_3d.py graph](images/clarke_park_3d.png)

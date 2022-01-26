@@ -56,7 +56,7 @@ def do_clarke_transform():
         clarke_matrix,
         np.array(
             [
-                np.sin(data[0, 1, :]),
+                np.sin(data[0, 1, :] + (radian_offset * 2 * np.pi)),
                 np.sin(data[1, 1, :] + (radian_offset * 2 * np.pi) + _120),
                 np.sin(data[2, 1, :] + (radian_offset * 2 * np.pi) + _240),
             ]
@@ -207,6 +207,18 @@ def generate_figure_data():
     figure_data = {
         "data": [
             {
+                "x": [0, 1],
+                "y": [-1, 1],
+                "z": [-1, 1],
+                "type": "scatter3d",
+                "mode": "lines",
+                "name": "fixed_xyz_range",
+                "line": {
+                    "width": 0,
+                    "color": "rgba(0,0,0,0)",
+                },
+            },
+            {
                 "x": data[0, 0, :],
                 "y": np.sin(data[0, 1, :] + (radian_offset * 2 * np.pi)),
                 "z": np.cos(data[0, 2, :] + (radian_offset * 2 * np.pi)),
@@ -237,6 +249,7 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Phasor A",
+                "line": {"width": 5},
             },
             {
                 "x": [0, 0],
@@ -245,6 +258,7 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Phasor B",
+                "line": {"width": 5},
             },
             {
                 "x": [0, 0],
@@ -253,6 +267,7 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Phasor C",
+                "line": {"width": 5},
             },
             {
                 "x": data[0, 0, :],
@@ -277,6 +292,10 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Clarke α",
+                "line": {
+                    "width": 10,
+                    "dash": "dash",
+                },
             },
             {
                 "x": [0, 0],
@@ -285,6 +304,10 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Clarke β",
+                "line": {
+                    "width": 10,
+                    "dash": "dash",
+                },
             },
         ],
     }

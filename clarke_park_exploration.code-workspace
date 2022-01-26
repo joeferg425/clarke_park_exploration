@@ -11,7 +11,14 @@
 				"name": "Python: Clarke/Park 2D",
 				"type": "python",
 				"request": "launch",
-				"program": "${workspaceFolder}/clarke_park.py",
+				"program": "${workspaceFolder}/clarke_park_2d.py",
+				"console": "integratedTerminal"
+			},
+			{
+				"name": "Python: Clarke/Park 3D",
+				"type": "python",
+				"request": "launch",
+				"program": "${workspaceFolder}/clarke_park_3d.py",
 				"console": "integratedTerminal"
 			},
 			{

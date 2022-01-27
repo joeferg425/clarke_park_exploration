@@ -1,12 +1,54 @@
-from matplotlib.pyplot import cla
 import numpy as np
 import dash
 from dash import dcc
 from dash import html
 from dash.dependencies import Input, Output
-from enum import IntEnum
+from enum import IntEnum, Enum
+import dash_bootstrap_components as dbc
 
-from sqlalchemy import false
+
+class AxisEnum(IntEnum):
+    X = 0
+    Y = 1
+    Z = 2
+
+
+class PhaseEnum(IntEnum):
+    A = 0
+    B = 1
+    C = 2
+
+
+class ClarkeEnum(IntEnum):
+    A = 0
+    B = 1
+
+
+class ColorEnum(Enum):
+    """This is supposed to be a colorblind-friendly palette.
+
+    Args:
+        Enum: color enum
+    """
+
+    PhaseA = "#E69F00"
+    PhaseB = "#0072B2"
+    PhaseC = "#CC79A7"
+    ClarkeA = "#D55E00"
+    ClarkeB = "#56B4E9"
+    Other1 = "#F0E442"
+    Other2 = "#999999"
+
+
+class DashEnum(Enum):
+    Normal = "solid"
+    Clarke = "dash"
+
+
+class WidthEnum(Enum):
+    Time = 2
+    Phasor = 5
+    Clarke = 6
 
 
 class FocusAxis(IntEnum):
@@ -19,7 +61,7 @@ class FocusAxis(IntEnum):
 
 focus_selection = FocusAxis.XYZ
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, title="Clarke & Park Transforms", external_stylesheets=[dbc.themes.DARKLY])
 
 two_pi = 2 * np.pi
 _120 = two_pi * (1 / 3)
@@ -27,10 +69,12 @@ _240 = two_pi * (2 / 3)
 slider_count = 100
 sample_count = 100
 first = True
+height = 1000
+width = 1200
 
 data = np.ones((3, 3, sample_count))
 data[:, :] *= np.linspace(0, 1, sample_count)
-data[:, [1, 2]] *= 2 * np.pi
+data[:, [AxisEnum.Y, AxisEnum.Z]] *= 2 * np.pi
 zeros = np.zeros((sample_count))
 radian_offset = 0
 fig = None
@@ -56,30 +100,13 @@ def do_clarke_transform():
         clarke_matrix,
         np.array(
             [
-                np.sin(data[0, 1, :] + (radian_offset * 2 * np.pi)),
-                np.sin(data[1, 1, :] + (radian_offset * 2 * np.pi) + _120),
-                np.sin(data[2, 1, :] + (radian_offset * 2 * np.pi) + _240),
+                np.sin(data[PhaseEnum.A, AxisEnum.Y, :] + (radian_offset * 2 * np.pi)),
+                np.sin(data[PhaseEnum.B, AxisEnum.Y, :] + (radian_offset * 2 * np.pi) + _120),
+                np.sin(data[PhaseEnum.B, AxisEnum.Y, :] + (radian_offset * 2 * np.pi) + _240),
             ]
         )
         # * np.array([self.amplitude1, self.amplitude2, self.amplitude3])[:, None],
     )
-    # assign outputs to individual variables for polar plots
-    # (
-    #     self.clarke_alpha_instantaneous,
-    #     self.clarke_beta_instantaneous,
-    #     self.clarke_zero_instantaneous,
-    # ) = self.clarke_alpha_beta_zero_array[:, 0]
-    # # matplotlib likes positive vector lengths
-    # if self.clarke_alpha_instantaneous >= 0:
-    #     self.clarke_alpha_instantaneous_angle = 0.0
-    # else:
-    #     self.clarke_alpha_instantaneous_angle = np.pi
-    #     self.clarke_alpha_instantaneous *= -1
-    # if self.clarke_beta_instantaneous >= 0:
-    #     self.clarke_beta_instantaneous_angle = np.pi * 3 / 2
-    # else:
-    #     self.clarke_beta_instantaneous_angle = np.pi / 2
-    #     self.clarke_beta_instantaneous *= -1
     return clarke_alpha_beta_zero_array
 
 
@@ -158,24 +185,41 @@ def do_clarke_transform():
 #         self.park_q_instantaneous_angle += 2 * np.pi
 
 
-app.layout = html.Div(
+# app.layout = dbc.Div(
+app.layout = dbc.Container(
     [
+        html.H1("Interactive Clarke & Park Transforms"),
+        html.Div(
+            [
+                html.P("Plotted lines can be turned on or off by clicking on the plot legend."),
+                html.P("Buttons near bottom of screen can be used to set the veiw to fixed perspectives."),
+                html.P("Graph can be zoomed and panned by interacting with it using the mouse and menu."),
+                html.P("Sliders near bottom of screen can be used to adjust variables used in the graph."),
+            ]
+        ),
         html.Div(
             [
                 dcc.Graph(
                     id="scatter-plot",
                     style={
-                        "height": 700,
-                        "width": 700,
+                        "height": height,
+                        "width": width,
                         "scene_aspectmode": "cube",
                     },
                 )
             ],
             style={
-                "height": "700v",
-                "width": "700v",
+                "height": height,
+                "width": width,
                 "scene_aspectmode": "cube",
             },
+        ),
+        html.Div(
+            [
+                html.P(
+                    "Use this slider to adjust the time axis by adding an offset from zero to one (the signal is 1 Hertz)."
+                ),
+            ]
         ),
         html.Div(
             [
@@ -186,14 +230,15 @@ app.layout = html.Div(
                     step=1 / slider_count,
                     value=0,
                     updatemode="drag",
+                    tooltip={"placement": "bottom", "always_visible": True},
                 )
             ]
         ),
         html.Div(
             [
-                html.Button("Focus X/Y", id="focus-xy", n_clicks=0),
-                html.Button("Focus X/Z", id="focus-xz", n_clicks=0),
-                html.Button("Focus Y/Z", id="focus-yz", n_clicks=0),
+                html.Button("Focus X/Y (real / sine)", id="focus-xy", n_clicks=0),
+                html.Button("Focus X/Z (imaginary / cosine)", id="focus-xz", n_clicks=0),
+                html.Button("Focus Y/Z (polar)", id="focus-yz", n_clicks=0),
                 html.Button("Focus X/Y/Z", id="focus-corner", n_clicks=0),
             ]
         ),
@@ -219,28 +264,43 @@ def generate_figure_data():
                 },
             },
             {
-                "x": data[0, 0, :],
-                "y": np.sin(data[0, 1, :] + (radian_offset * 2 * np.pi)),
-                "z": np.cos(data[0, 2, :] + (radian_offset * 2 * np.pi)),
+                "x": data[PhaseEnum.A, AxisEnum.X, :],
+                "y": np.sin(data[PhaseEnum.A, AxisEnum.Y, :] + (radian_offset * 2 * np.pi)),
+                "z": np.cos(data[PhaseEnum.A, AxisEnum.Z, :] + (radian_offset * 2 * np.pi)),
                 "type": "scatter3d",
                 "mode": "lines",
-                "name": "Phase A",
+                "name": "Phase A (t)",
+                "line": {
+                    "width": WidthEnum.Time.value,
+                    "dash": DashEnum.Normal.value,
+                    "color": ColorEnum.PhaseA.value,
+                },
             },
             {
-                "x": data[1, 0, :],
-                "y": np.sin(data[1, 1, :] + (radian_offset * 2 * np.pi) + _120),
-                "z": np.cos(data[1, 2, :] + (radian_offset * 2 * np.pi) + _120),
+                "x": data[PhaseEnum.B, AxisEnum.X, :],
+                "y": np.sin(data[PhaseEnum.B, AxisEnum.Y, :] + (radian_offset * 2 * np.pi) + _120),
+                "z": np.cos(data[PhaseEnum.B, AxisEnum.Z, :] + (radian_offset * 2 * np.pi) + _120),
                 "type": "scatter3d",
                 "mode": "lines",
-                "name": "Phase B",
+                "name": "Phase B (t)",
+                "line": {
+                    "width": WidthEnum.Time.value,
+                    "dash": DashEnum.Normal.value,
+                    "color": ColorEnum.PhaseB.value,
+                },
             },
             {
-                "x": data[2, 0, :],
-                "y": np.sin(data[2, 1, :] + (radian_offset * 2 * np.pi) + _240),
-                "z": np.cos(data[2, 2, :] + (radian_offset * 2 * np.pi) + _240),
+                "x": data[PhaseEnum.C, AxisEnum.X, :],
+                "y": np.sin(data[PhaseEnum.C, AxisEnum.Y, :] + (radian_offset * 2 * np.pi) + _240),
+                "z": np.cos(data[PhaseEnum.C, AxisEnum.Z, :] + (radian_offset * 2 * np.pi) + _240),
                 "type": "scatter3d",
                 "mode": "lines",
-                "name": "Phase C",
+                "name": "Phase C (t)",
+                "line": {
+                    "width": WidthEnum.Time.value,
+                    "dash": DashEnum.Normal.value,
+                    "color": ColorEnum.PhaseC.value,
+                },
             },
             {
                 "x": [0, 0],
@@ -249,7 +309,11 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Phasor A",
-                "line": {"width": 5},
+                "line": {
+                    "width": WidthEnum.Phasor.value,
+                    "dash": DashEnum.Normal.value,
+                    "color": ColorEnum.PhaseA.value,
+                },
             },
             {
                 "x": [0, 0],
@@ -258,7 +322,11 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Phasor B",
-                "line": {"width": 5},
+                "line": {
+                    "width": WidthEnum.Phasor.value,
+                    "dash": DashEnum.Normal.value,
+                    "color": ColorEnum.PhaseB.value,
+                },
             },
             {
                 "x": [0, 0],
@@ -267,7 +335,11 @@ def generate_figure_data():
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Phasor C",
-                "line": {"width": 5},
+                "line": {
+                    "width": WidthEnum.Phasor.value,
+                    "dash": DashEnum.Normal.value,
+                    "color": ColorEnum.PhaseC.value,
+                },
             },
             {
                 "x": data[0, 0, :],
@@ -275,7 +347,12 @@ def generate_figure_data():
                 "z": zeros,
                 "type": "scatter3d",
                 "mode": "lines",
-                "name": "Clarke α(t)",
+                "name": "Clarke α (t)",
+                "line": {
+                    "width": WidthEnum.Time.value,
+                    "dash": DashEnum.Clarke.value,
+                    "color": ColorEnum.ClarkeA.value,
+                },
             },
             {
                 "x": data[0, 0, :],
@@ -283,7 +360,12 @@ def generate_figure_data():
                 "z": clarke[1, :],
                 "type": "scatter3d",
                 "mode": "lines",
-                "name": "Clarke β(t)",
+                "name": "Clarke β (t)",
+                "line": {
+                    "width": WidthEnum.Time.value,
+                    "dash": DashEnum.Clarke.value,
+                    "color": ColorEnum.ClarkeB.value,
+                },
             },
             {
                 "x": [0, 0],
@@ -293,8 +375,9 @@ def generate_figure_data():
                 "mode": "lines",
                 "name": "Clarke α",
                 "line": {
-                    "width": 10,
-                    "dash": "dash",
+                    "width": WidthEnum.Clarke.value,
+                    "dash": DashEnum.Clarke.value,
+                    "color": ColorEnum.ClarkeA.value,
                 },
             },
             {
@@ -305,62 +388,45 @@ def generate_figure_data():
                 "mode": "lines",
                 "name": "Clarke β",
                 "line": {
-                    "width": 10,
-                    "dash": "dash",
+                    "width": WidthEnum.Clarke.value,
+                    "dash": DashEnum.Clarke.value,
+                    "color": ColorEnum.ClarkeB.value,
                 },
             },
         ],
+        "layout": {
+            "scene": {
+                "xaxis": {"title": "x (Time)"},
+                "yaxis": {"title": "y (Real)"},
+                "zaxis": {"title": "z (Imaginary)"},
+            },
+            "plot_bgcolor": "rgba(0, 0, 0, 0)",
+            "paper_bgcolor": "rgba(0, 0, 0, 0)",
+        },
     }
     if first is False:
-        figure_data["layout"] = {
-            "uirevision": 1,
-            "xaxis": {"range": [-1, 1]},
-            "yaxis": {"range": [-1, 1]},
-            "zaxis": {"range": [-1, 1]},
-            "scene": {
-                # "aspectmode": "manual",
-                "aspectratio": {
-                    "x": 1,
-                    "y": 1,
-                    "z": 1,
-                },
-            },
-        }
-    else:
-        first = False
-        figure_data["layout"] = {
-            "uirevision": 1,
-            "height": 700,
-            "width": 700,
-            "xaxis": {"range": [-1, 1]},
-            "yaxis": {"range": [-1, 1]},
-            "zaxis": {"range": [-1, 1]},
-            "scene_aspectmode": "cube",
-            "autosize": False,
-            "scene": {
-                "aspectmode": "manual",
-                "aspectratio": {
-                    "x": 1,
-                    "y": 1,
-                    "z": 1,
-                },
-            },
+        figure_data["layout"]["uirevision"] = 1
+        figure_data["layout"]["scene"]["aspectratio"] = {
+            "x": 1,
+            "y": 1,
+            "z": 1,
         }
 
-    if focus_selection == FocusAxis.XYZ:
-        figure_data["layout"]["scene"]["camera"] = {
-            "up": {
-                "x": 0.0,
-                "y": 0.5,
-                "z": 0.0,
-            },
-            "eye": {
-                "x": 1.75,
-                "y": 1.75,
-                "z": 1.75,
-            },
+    else:
+        first = False
+        figure_data["layout"]["uirevision"] = 1
+        figure_data["layout"]["height"] = height
+        figure_data["layout"]["width"] = width
+        figure_data["layout"]["scene_aspectmode"] = "cube"
+        figure_data["layout"]["autosize"] = False
+        figure_data["layout"]["scene"]["aspectmode"] = "manual"
+        figure_data["layout"]["scene"]["aspectratio"] = {
+            "x": 1,
+            "y": 1,
+            "z": 1,
         }
-    elif focus_selection == FocusAxis.XY:
+
+    if focus_selection == FocusAxis.XY:
         figure_data["layout"]["scene"]["camera"] = {
             "up": {
                 "x": 0.0,
@@ -382,7 +448,7 @@ def generate_figure_data():
             },
             "eye": {
                 "x": 0.0,
-                "y": 2.0,
+                "y": -2.0,
                 "z": 0.0,
             },
         }
@@ -394,20 +460,24 @@ def generate_figure_data():
                 "z": 0.0,
             },
             "eye": {
-                "x": 2.0,
+                "x": -2.0,
                 "y": 0.0,
                 "z": 0.0,
             },
         }
-    # else:
-    #     figure_data["layout"]["scene"]["camera"] = {
-    #         "eye": graph.figure.layout.scene.eye,
-    #         "up": {
-    #             "x": 0.0,
-    #             "y": 0.0,
-    #             "z": 0.0,
-    #         },
-    #     }
+    elif focus_selection == FocusAxis.XYZ:
+        figure_data["layout"]["scene"]["camera"] = {
+            "up": {
+                "x": 0.0,
+                "y": 0.5,
+                "z": 0.0,
+            },
+            "eye": {
+                "x": 1.75,
+                "y": 1.75,
+                "z": 1.75,
+            },
+        }
 
     # focus_selection = FocusAxis.NONE
 

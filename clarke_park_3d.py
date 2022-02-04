@@ -5,7 +5,6 @@ from dash import html
 from dash.dependencies import Input, Output
 from enum import IntEnum, Enum
 import dash_bootstrap_components as dbc
-from dash import dash_table
 
 
 class AxisEnum(IntEnum):
@@ -29,6 +28,7 @@ class ClarkeEnum(IntEnum):
 class ParkEnum(IntEnum):
     D = 0
     Q = 1
+    Z = 2
 
 
 class ColorEnum(Enum):
@@ -70,8 +70,18 @@ class FocusAxis(IntEnum):
 
 
 focus_selection = FocusAxis.XYZ
-
-app = dash.Dash(__name__, title="Clarke & Park Transforms", external_stylesheets=[dbc.themes.DARKLY])
+app = dash.Dash(
+    __name__,
+    title="Clarke & Park Transforms",
+    external_stylesheets=[dbc.themes.DARKLY],
+    external_scripts=[
+        {
+            "type": "text/javascript",
+            "id": "MathJax-script",
+            "src": "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML",
+        },
+    ],
+)
 
 two_pi = 2 * np.pi
 _120 = two_pi * (1 / 3)
@@ -86,6 +96,8 @@ margin = 1
 data = np.ones((3, 3, sample_count))
 data[:, :] *= np.linspace(0, 1, sample_count)
 data[:, [AxisEnum.Y, AxisEnum.Z]] *= 2 * np.pi
+clarke = None
+park = None
 zeros = np.zeros((sample_count))
 ones = np.zeros((sample_count))
 zeros3 = np.zeros((3, sample_count))
@@ -106,7 +118,7 @@ def do_clarke_transform():
     https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_transformation
     https://www.mathworks.com/help/physmod/sps/ref/clarketransform.html
     """
-    global data
+    global data, clarke
     # Clarke transform
     clarke_matrix = (2 / 3) * np.array(
         [
@@ -116,7 +128,7 @@ def do_clarke_transform():
         ]
     )
     # Clarke transform function
-    return np.dot(
+    clarke = np.dot(
         clarke_matrix,
         np.array(
             [
@@ -127,15 +139,16 @@ def do_clarke_transform():
         )
         * np.array([phaseA_amplitude, phaseB_amplitude, phaseC_amplitude])[:, None],
     )
+    return clarke
 
 
-def do_park_transform(clarke_data):
+def do_park_transform():
     """Perform Park transform function.
 
     https://de.wikipedia.org/wiki/D/q-Transformation
     https://www.mathworks.com/help/physmod/sps/ref/clarketoparkangletransform.html
     """
-    global data
+    global data, clarke, park
     # create Park transformation matrix, with reference based on enum value
     park_matrix = np.array(
         [
@@ -157,14 +170,14 @@ def do_park_transform(clarke_data):
         ]
     )
     # perform the matrix math
-    return np.einsum(
+    park = np.einsum(
         "ijk,ik->jk",
         park_matrix,
-        clarke_data,
+        clarke,
     )
+    return park
 
 
-# app.layout = dbc.Div(
 app.layout = dbc.Container(
     [
         html.H1("Interactive Clarke & Park Transforms"),
@@ -176,6 +189,40 @@ app.layout = dbc.Container(
                 html.P("Sliders near bottom of screen can be used to adjust variables used in the graph."),
             ]
         ),
+        html.H2("If the math below does not render, press CTRL+F5."),
+        html.P("Three phase helix data."),
+        html.Table(
+            html.Tr(
+                [
+                    html.Td(
+                        "$$ \\begin{bmatrix}  A_x & A_y & A_z \\\\ B_x & B_y & B_z \\\\ C_x & C_y & C_z  \\end{bmatrix} = \\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} = $$"
+                    ),
+                    html.Td(id="three_phase_data"),
+                ]
+            )
+        ),
+        html.P("Clarke transforme data."),
+        html.Table(
+            html.Tr(
+                [
+                    html.Td(
+                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} \\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ \\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix}\\begin{bmatrix} A_y \\\\ B_y \\\\ C_y \\end{bmatrix} = \\begin{bmatrix}  \\alpha \\\\ \\beta   \\\\ Z_{C} \\end{bmatrix} = $$"
+                    ),
+                    html.Td(id="clarke_data"),
+                ]
+            )
+        ),
+        html.P("Park Transform data."),
+        html.Table(
+            html.Tr(
+                [
+                    html.Td(
+                        "$$ \\begin{bmatrix} sin(\\Theta) & -cos(\\Theta) & 0 \\\\ cos(\\Theta) & sin(\\Theta) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} \\begin{bmatrix} \\alpha \\\\ \\beta \\\\ Z_{C} \\end{bmatrix} = \\begin{bmatrix} d \\\\ q \\\\ Z_{P} \\end{bmatrix} = $$"
+                    ),
+                    html.Td(id="park_data"),
+                ]
+            )
+        ),
         html.Div(
             [
                 dcc.Graph(
@@ -186,173 +233,6 @@ app.layout = dbc.Container(
                 )
             ],
         ),
-        html.P("The three-phase, three-axis matrix."),
-        html.Table(
-            [
-                html.Tr(
-                    [
-                        html.Td(
-                            "",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "A",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "B",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "C",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(
-                            "X",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "A[X]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "B[X]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "C[X]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(
-                            "Y",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "A[Y]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "B[Y]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "C[Y]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(
-                            "Z",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            " A[Z] ",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "B[Z]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                        html.Td(
-                            "C[Z]",
-                            style={
-                                "border-style": "solid",
-                                "border-color": "rgba(0,0,0,0)",
-                                "border-width": "10px",
-                            },
-                        ),
-                    ]
-                ),
-            ],
-            style={"border-collapse": "collapse", "border-spacing": "10px"},
-            id="matrix",
-        ),
-        # dash_table.DataTable(
-        #     id="clarke_table",
-        #     columns=[
-        #         {"id": "0", "name": ""},
-        #         {"id": "1", "name": "A"},
-        #         {"id": "2", "name": "B"},
-        #         {"id": "3", "name": "C"},
-        #     ],
-        #     style_table={
-        #         "backgroundColor": "rgba(0,0,0,0)",
-        #     },
-        #     style_cell={
-        #         "textAlign": "left",
-        #         "backgroundColor": "rgba(0,0,0,0)",
-        #     },
-        # ),
         html.Div(
             [
                 html.P("Sometimes you have to switch views more than once for plotly to reset any rotation."),
@@ -478,9 +358,9 @@ app.layout = dbc.Container(
 
 
 def generate_figure_data():
-    global data, time_offset, focus_selection, first
-    clarke = do_clarke_transform()
-    park = do_park_transform(clarke)
+    global data, time_offset, focus_selection, clarke, park, first
+    do_clarke_transform()
+    do_park_transform()
     figure_data = {
         "data": [
             {
@@ -652,7 +532,7 @@ def generate_figure_data():
             },
             {
                 "x": [0, 0],
-                "y": [0, clarke[0, 0]],
+                "y": [0, clarke[ClarkeEnum.A, 0]],
                 "z": [0, 0],
                 "type": "scatter3d",
                 "mode": "lines",
@@ -666,7 +546,7 @@ def generate_figure_data():
             {
                 "x": [0, 0],
                 "y": [0, 0],
-                "z": [0, clarke[1, 0]],
+                "z": [0, clarke[ClarkeEnum.B, 0]],
                 "type": "scatter3d",
                 "mode": "lines",
                 "name": "Clarke β",
@@ -891,7 +771,12 @@ def generate_figure_data():
 
 @app.callback(
     # Output("scatter_plot", "figure"),
-    [Output("scatter_plot", "figure"), Output("matrix", "children")],
+    [
+        Output("scatter_plot", "figure"),
+        Output("three_phase_data", "children"),
+        Output("clarke_data", "children"),
+        Output("park_data", "children"),
+    ],
     [
         Input("time_slider", "value"),
         Input("phaseA_amplitude_slider", "value"),
@@ -921,7 +806,7 @@ def update_graphs(
     btn3,
     btn4,
 ):
-    global time_offset, phaseA_amplitude, phaseB_amplitude, phaseC_amplitude, phaseA_offset, phaseB_offset, phaseC_offset, focus_selection, height, width
+    global time_offset, phaseA_amplitude, phaseB_amplitude, phaseC_amplitude, phaseA_offset, phaseB_offset, phaseC_offset, focus_selection, height, width, clarke, park
     time_offset = time_slider
     phaseA_offset = phaseA_phase_slider
     phaseB_offset = phaseB_phase_slider
@@ -942,154 +827,88 @@ def update_graphs(
         focus_selection = FocusAxis.XYZ
     return [
         generate_figure_data(),
-        [
-            html.Tr(
-                [
-                    html.Td(
-                        "",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        "A",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        "B",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        "C",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                ]
-            ),
-            html.Tr(
-                [
-                    html.Td(
-                        "X",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseA_offset + data[PhaseEnum.A, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseB_offset + data[PhaseEnum.B, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseC_offset + data[PhaseEnum.C, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                ]
-            ),
-            html.Tr(
-                [
-                    html.Td(
-                        "Y",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseA_amplitude * np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, 0] + (time_offset * 2 * np.pi)):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseB_amplitude * np.sin(phaseB_offset + data[PhaseEnum.B, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _120):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseC_amplitude * np.sin(phaseC_offset + data[PhaseEnum.C, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _240):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                ]
-            ),
-            html.Tr(
-                [
-                    html.Td(
-                        "Z",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseA_amplitude * np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, 0] + (time_offset * 2 * np.pi)):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseB_amplitude * np.cos(phaseB_offset + data[PhaseEnum.B, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _120):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                    html.Td(
-                        f"{phaseC_amplitude * np.cos(phaseC_offset + data[PhaseEnum.C, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _240):0.2f}",
-                        style={
-                            "border-style": "solid",
-                            "border-color": "rgba(0,0,0,0)",
-                            "border-width": "10px",
-                        },
-                    ),
-                ]
-            ),
-        ],
+        html.Td(
+            [
+                html.Tr(
+                    [
+                        html.Td(
+                            f"{phaseA_offset + data[PhaseEnum.A, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}\u00A0\u00A0"
+                        ),
+                        html.Td(
+                            f"{phaseA_amplitude * np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, 0] + (time_offset * 2 * np.pi)):0.2f}\u00A0\u00A0"
+                        ),
+                        html.Td(
+                            f"{phaseA_amplitude * np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, 0] + (time_offset * 2 * np.pi)):0.2f}\u00A0\u00A0"
+                        ),
+                    ]
+                ),
+                html.Tr(
+                    [
+                        html.Td(
+                            f"{phaseB_offset + data[PhaseEnum.B, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}\u00A0\u00A0"
+                        ),
+                        html.Td(
+                            f"{phaseB_amplitude * np.sin(phaseB_offset + data[PhaseEnum.B, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _120):0.2f}\u00A0\u00A0"
+                        ),
+                        html.Td(
+                            f"{phaseB_amplitude * np.cos(phaseB_offset + data[PhaseEnum.B, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _120):0.2f}\u00A0\u00A0"
+                        ),
+                    ]
+                ),
+                html.Tr(
+                    [
+                        html.Td(
+                            f"{phaseC_offset + data[PhaseEnum.C, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}\u00A0\u00A0"
+                        ),
+                        html.Td(
+                            f"{phaseC_amplitude * np.sin(phaseC_offset + data[PhaseEnum.C, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _240):0.2f}\u00A0\u00A0"
+                        ),
+                        html.Td(
+                            f"{phaseC_amplitude * np.cos(phaseC_offset + data[PhaseEnum.C, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _240):0.2f}\u00A0\u00A0"
+                        ),
+                    ]
+                ),
+            ]
+        ),
+        html.Td(
+            [
+                html.Tr(
+                    [
+                        html.Td(f"{clarke[ClarkeEnum.A, 0]:0.2f}"),
+                    ]
+                ),
+                html.Tr(
+                    [
+                        html.Td(f"{clarke[ClarkeEnum.B, 0]:0.2f}"),
+                    ]
+                ),
+                html.Tr(
+                    [
+                        html.Td(f"{clarke[ClarkeEnum.Z, 0]:0.2f}"),
+                    ]
+                ),
+            ]
+        ),
+        html.Td(
+            [
+                html.Tr(
+                    [
+                        html.Td(f"{park[ParkEnum.D, 0]:0.2f}"),
+                    ]
+                ),
+                html.Tr(
+                    [
+                        html.Td(f"{park[ParkEnum.Q, 0]:0.2f}"),
+                    ]
+                ),
+                html.Tr(
+                    [
+                        html.Td(f"{park[ParkEnum.Z, 0]:0.2f}"),
+                    ]
+                ),
+            ]
+        ),
     ]
-    # return generate_figure_data()
 
 
 app.run_server(debug=True)

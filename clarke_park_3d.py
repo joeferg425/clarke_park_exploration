@@ -201,7 +201,7 @@ app.layout = dbc.Container(
                 ]
             )
         ),
-        html.P("Clarke transforme data."),
+        html.P("Clarke transform data."),
         html.Table(
             html.Tr(
                 [

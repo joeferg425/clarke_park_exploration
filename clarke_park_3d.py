@@ -5,6 +5,8 @@ from dash import html
 from dash.dependencies import Input, Output
 from enum import IntEnum, Enum
 import dash_bootstrap_components as dbc
+from sqlalchemy import true
+import dash_daq as daq
 
 
 class AxisEnum(IntEnum):
@@ -92,10 +94,8 @@ first = True
 height = 800
 width = height * 1.25
 margin = 1
+projection = "isometric"
 
-data = np.ones((3, 3, sample_count))
-data[:, :] *= np.linspace(0, 1, sample_count)
-data[:, [AxisEnum.Y, AxisEnum.Z]] *= 2 * np.pi
 clarke = None
 park = None
 zeros = np.zeros((sample_count))
@@ -103,6 +103,7 @@ ones = np.zeros((sample_count))
 zeros3 = np.zeros((3, sample_count))
 ones3 = np.zeros((3, sample_count))
 time_offset = 0
+frequency = 1
 phaseA_offset = 0
 phaseB_offset = 0
 phaseC_offset = 0
@@ -110,6 +111,13 @@ phaseA_amplitude = 0
 phaseB_amplitude = 0
 phaseC_amplitude = 0
 fig = None
+
+
+def regen_three_phase_data():
+    global data, frequency
+    data = np.ones((3, 3, sample_count))
+    data[:, :] *= np.linspace(0, 1, sample_count)
+    data[:, [AxisEnum.Y, AxisEnum.Z]] *= frequency * 2 * np.pi
 
 
 def do_clarke_transform():
@@ -189,13 +197,26 @@ app.layout = dbc.Container(
                 html.P("Sliders near bottom of screen can be used to adjust variables used in the graph."),
             ]
         ),
-        html.H2("If the math below does not render, press CTRL+F5."),
+        html.H4(
+            "If the math below does not render, try refreshing and/or force refreshing by pressing CTRL+F5."
+        ),
         html.P("Three phase helix data."),
         html.Table(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\begin{bmatrix}  A_x & A_y & A_z \\\\ B_x & B_y & B_z \\\\ C_x & C_y & C_z  \\end{bmatrix} = \\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} = $$"
+                        "$$ \\begin{bmatrix}  A_x(t) & A_y(t) & A_z(t) \\\\ B_x(t) & B_y(t) & B_z(t) \\\\ C_x(t) & C_y(t) & C_z(t)  \\end{bmatrix} = \\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} $$"
+                    ),
+                    html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
+                    html.Td(
+                        [
+                            html.P(
+                                "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 For t = time slider below."
+                            ),
+                            html.P(
+                                "$$ \\begin{bmatrix}  A_x(slider) & A_y(slider) & A_z(slider) \\\\ B_x(slider) & B_y(slider) & B_z(slider) \\\\ C_x(slider) & C_y(slider) & C_z(slider) \\end{bmatrix} = $$"
+                            ),
+                        ]
                     ),
                     html.Td(id="three_phase_data"),
                 ]
@@ -206,7 +227,18 @@ app.layout = dbc.Container(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} \\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ \\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix}\\begin{bmatrix} A_y \\\\ B_y \\\\ C_y \\end{bmatrix} = \\begin{bmatrix}  \\alpha \\\\ \\beta   \\\\ Z_{C} \\end{bmatrix} = $$"
+                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} \\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ \\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix}\\begin{bmatrix} A_y(t) \\\\ B_y(t) \\\\ C_y(t) \\end{bmatrix} = \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
+                    ),
+                    html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
+                    html.Td(
+                        [
+                            html.P(
+                                "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 For t = time slider below."
+                            ),
+                            html.P(
+                                "$$ \\begin{bmatrix}  \\alpha(slider) \\\\ \\beta(slider)  \\\\ Z_{C}(slider) \\end{bmatrix} = $$",
+                            ),
+                        ]
                     ),
                     html.Td(id="clarke_data"),
                 ]
@@ -217,7 +249,18 @@ app.layout = dbc.Container(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\begin{bmatrix} sin(\\Theta) & -cos(\\Theta) & 0 \\\\ cos(\\Theta) & sin(\\Theta) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} \\begin{bmatrix} \\alpha \\\\ \\beta \\\\ Z_{C} \\end{bmatrix} = \\begin{bmatrix} d \\\\ q \\\\ Z_{P} \\end{bmatrix} = $$"
+                        "$$ \\begin{bmatrix} sin(\\omega t) & -cos(\\omega t) & 0 \\\\ cos(\\omega t) & sin(\\omega t) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} \\begin{bmatrix} \\alpha(t) \\\\ \\beta(t) \\\\ Z_{C}(t) \\end{bmatrix} = \\begin{bmatrix} d(t) \\\\ q(t) \\\\ Z_{P}(t) \\end{bmatrix} $$"
+                    ),
+                    html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
+                    html.Td(
+                        [
+                            html.P(
+                                "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 For t = time slider below."
+                            ),
+                            html.P(
+                                "$$ \\begin{bmatrix} d(slider) \\\\ q(slider) \\\\ Z_{P}(slider) \\end{bmatrix} = $$"
+                            ),
+                        ]
                     ),
                     html.Td(id="park_data"),
                 ]
@@ -235,117 +278,177 @@ app.layout = dbc.Container(
         ),
         html.Div(
             [
+                html.P("Use the following controls to change the perspective of the graph."),
                 html.P("Sometimes you have to switch views more than once for plotly to reset any rotation."),
-                html.Button("View X/Y (real / sine)", id="focus_xy", n_clicks=0),
-                html.Button("View X/Z (imaginary / cosine)", id="focus_xz", n_clicks=0),
+            ]
+        ),
+        html.Div(
+            daq.BooleanSwitch(id="projection", on=True, label="Isometric", labelPosition="top"),
+            style={
+                "display": "flex",
+                "align-items": "left",
+                "justify-content": "left",
+            },
+        ),
+        html.Div(
+            [
+                html.Button("View X/Y (imaginary / sine)", id="focus_xy", n_clicks=0),
+                html.Button("View X/Z (real / cosine)", id="focus_xz", n_clicks=0),
                 html.Button("View Y/Z (polar)", id="focus_yz", n_clicks=0),
                 html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
             ]
         ),
+        html.P(),
+        html.Br(),
         html.Div(
             [
-                html.P(
-                    "Use this slider to adjust the time axis by adding an "
-                    + "offset from zero to one (the signal is 1 Hertz)."
-                ),
+                html.P("Use this slider to adjust the time axis by adding an " + "offset from zero to one."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
                     id="time_slider",
                     min=0,
                     max=1,
                     step=1 / slider_count,
                     value=0,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
-                html.P("This slider controls Phase A amplitude."),
+                html.Br(),
+                html.P("This slider adjusts the frequency of the sine waves (\\(  \\omega \\) )."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
+                    id="frequency_slider",
+                    min=0.5,
+                    max=5,
+                    step=1 / slider_count,
+                    value=1,
+                    updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
+                    tooltip={
+                        "placement": "bottom",
+                        "always_visible": True,
+                    },
+                ),
+                html.Br(),
+                html.P("This slider controls Phase A amplitude."),
+                # html.Br(),
+                dcc.Slider(
+                    # daq.Slider(
                     id="phaseA_amplitude_slider",
                     min=0.1,
                     max=2,
                     step=1 / slider_count,
                     value=1,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
+                html.Br(),
                 html.P("This slider controls Phase B amplitude."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
                     id="phaseB_amplitude_slider",
                     min=0.1,
                     max=2,
                     step=1 / slider_count,
                     value=1,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
+                html.Br(),
                 html.P("This slider controls Phase C amplitude."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
                     id="phaseC_amplitude_slider",
                     min=0.1,
                     max=2,
                     step=1 / slider_count,
                     value=1,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
+                html.Br(),
                 html.P("This slider adds a phase offset to Phase A."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
                     id="phaseA_phase_slider",
                     min=-np.pi,
                     max=np.pi,
                     step=1 / slider_count,
                     value=0,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
+                html.Br(),
                 html.P("This slider adds a phase offset to Phase B."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
                     id="phaseB_phase_slider",
                     min=-np.pi,
                     max=np.pi,
                     step=1 / slider_count,
                     value=0,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
+                html.Br(),
                 html.P("This slider adds a phase offset to Phase C."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
                     id="phaseC_phase_slider",
                     min=-np.pi,
                     max=np.pi,
                     step=1 / slider_count,
                     value=0,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
+                html.Br(),
                 html.P("This slider adjusts the size of the graphic."),
+                # html.Br(),
                 dcc.Slider(
+                    # daq.Slider(
                     id="size_slider",
                     min=400,
                     max=1600,
                     step=100,
                     value=700,
                     updatemode="drag",
+                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
@@ -358,7 +461,8 @@ app.layout = dbc.Container(
 
 
 def generate_figure_data():
-    global data, time_offset, focus_selection, clarke, park, first
+    global data, time_offset, focus_selection, clarke, park, first, projection
+    regen_three_phase_data()
     do_clarke_transform()
     do_park_transform()
     figure_data = {
@@ -763,6 +867,9 @@ def generate_figure_data():
                 "z": 1.75,
             },
         }
+    figure_data["layout"]["scene"]["camera"]["projection"] = {
+        "type": projection,
+    }
 
     # focus_selection = FocusAxis.NONE
 
@@ -776,46 +883,60 @@ def generate_figure_data():
         Output("three_phase_data", "children"),
         Output("clarke_data", "children"),
         Output("park_data", "children"),
+        Output("projection", "label"),
     ],
     [
         Input("time_slider", "value"),
+        Input("frequency_slider", "value"),
         Input("phaseA_amplitude_slider", "value"),
-        Input("phaseB_amplitude_slider", "value"),
-        Input("phaseC_amplitude_slider", "value"),
+        # Input("phaseB_amplitude_slider", "value"),
+        # Input("phaseC_amplitude_slider", "value"),
         Input("phaseA_phase_slider", "value"),
-        Input("phaseB_phase_slider", "value"),
-        Input("phaseC_phase_slider", "value"),
+        # Input("phaseB_phase_slider", "value"),
+        # Input("phaseC_phase_slider", "value"),
         Input("size_slider", "value"),
         Input("focus_xy", "n_clicks"),
         Input("focus_xz", "n_clicks"),
         Input("focus_yz", "n_clicks"),
         Input("focus_corner", "n_clicks"),
+        Input("projection", "on"),
     ],
 )
 def update_graphs(
     time_slider,
+    frequency_slider,
     phaseA_amplitude_slider,
-    phaseB_amplitude_slider,
-    phaseC_amplitude_slider,
+    # phaseB_amplitude_slider,
+    # phaseC_amplitude_slider,
     phaseA_phase_slider,
-    phaseB_phase_slider,
-    phaseC_phase_slider,
+    # phaseB_phase_slider,
+    # phaseC_phase_slider,
     size_slider,
     btn1,
     btn2,
     btn3,
     btn4,
+    projection_isometric,
 ):
-    global time_offset, phaseA_amplitude, phaseB_amplitude, phaseC_amplitude, phaseA_offset, phaseB_offset, phaseC_offset, focus_selection, height, width, clarke, park
+    global time_offset, phaseA_amplitude, phaseB_amplitude, phaseC_amplitude, phaseA_offset, phaseB_offset, phaseC_offset, focus_selection, height, width, clarke, park, projection, frequency
     time_offset = time_slider
+    frequency = frequency_slider
     phaseA_offset = phaseA_phase_slider
-    phaseB_offset = phaseB_phase_slider
-    phaseC_offset = phaseC_phase_slider
+    # phaseB_offset = phaseB_phase_slider
+    phaseB_offset = 0
+    # phaseC_offset = phaseC_phase_slider
+    phaseC_offset = 0
     phaseA_amplitude = phaseA_amplitude_slider
-    phaseB_amplitude = phaseB_amplitude_slider
-    phaseC_amplitude = phaseC_amplitude_slider
+    # phaseB_amplitude = phaseB_amplitude_slider
+    phaseB_amplitude = 1
+    # phaseC_amplitude = phaseC_amplitude_slider
+    phaseC_amplitude = 1
     height = size_slider
     width = size_slider * 1.25
+    if projection_isometric is True:
+        projection = "isometric"
+    else:
+        projection = "orthographic"
     changed_id = [p["prop_id"] for p in dash.callback_context.triggered][0]
     if "focus_xy" in changed_id:
         focus_selection = FocusAxis.XY
@@ -908,6 +1029,7 @@ def update_graphs(
                 ),
             ]
         ),
+        projection,
     ]
 
 

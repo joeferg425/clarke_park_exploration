@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 import dash
 from dash import dcc
@@ -5,7 +6,6 @@ from dash import html
 from dash.dependencies import Input, Output
 from enum import IntEnum, Enum
 import dash_bootstrap_components as dbc
-from sqlalchemy import true
 import dash_daq as daq
 
 
@@ -71,7 +71,6 @@ class FocusAxis(IntEnum):
     NONE = 4
 
 
-focus_selection = FocusAxis.XYZ
 app = dash.Dash(
     __name__,
     title="Clarke & Park Transforms",
@@ -85,107 +84,646 @@ app = dash.Dash(
     ],
 )
 
-two_pi = 2 * np.pi
-_120 = two_pi * (1 / 3)
-_240 = two_pi * (2 / 3)
-slider_count = 100
-sample_count = 100
-first = True
-height = 800
-width = height * 1.25
+PHASE_COUNT = 3
+AXIS_COUNT = 3
+TWO_PI = 2 * np.pi
+_120 = TWO_PI * (1 / 3)
+_240 = TWO_PI * (2 / 3)
 margin = 1
-projection = "isometric"
-
-clarke = None
-park = None
-zeros = np.zeros((sample_count))
-ones = np.zeros((sample_count))
-zeros3 = np.zeros((3, sample_count))
-ones3 = np.zeros((3, sample_count))
-time_offset = 0
-frequency = 1
-phaseA_offset = 0
-phaseB_offset = 0
-phaseC_offset = 0
-phaseA_amplitude = 0
-phaseB_amplitude = 0
-phaseC_amplitude = 0
 fig = None
 
 
-def regen_three_phase_data():
-    global data, frequency
-    data = np.ones((3, 3, sample_count))
-    data[:, :] *= np.linspace(0, 1, sample_count)
-    data[:, [AxisEnum.Y, AxisEnum.Z]] *= frequency * 2 * np.pi
+class ClarkeParkExploration:
+    INSTANCE: "ClarkeParkExploration"
 
+    def __init__(self) -> None:
+        self.frequency: float = 1.0
+        self.sample_count: int = 100
+        self.slider_count: int = 100
+        self.three_phase_data: np.ndarray = np.ones((PHASE_COUNT, AXIS_COUNT, self.sample_count))
+        self.three_phase_data[:, :] *= np.linspace(0, 1, self.sample_count)
+        self.clarke_data: np.ndarray = np.ones((PHASE_COUNT, self.sample_count))
+        self.park_data: np.ndarray = np.ones((AXIS_COUNT, self.sample_count))
+        self.zeros = np.zeros((self.sample_count))
+        self.ones = np.zeros((self.sample_count))
+        self.zeros3 = np.zeros((3, self.sample_count))
+        self.ones3 = np.zeros((3, self.sample_count))
+        self.height = 800
+        self.width = self.height * 1.25
+        self.projection = "isometric"
+        self.time_offset = 0
+        self.frequency = 1
+        self.phaseA_offset = 0
+        self.phaseB_offset = 0
+        self.phaseC_offset = 0
+        self.phaseA_amplitude = 0
+        self.phaseB_amplitude = 0
+        self.phaseC_amplitude = 0
+        self.changed_id: Any = None
+        self.focus_selection: FocusAxis = FocusAxis.XYZ
 
-def do_clarke_transform():
-    """Perform Clarke transform function.
+        self.first = True
 
-    https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_transformation
-    https://www.mathworks.com/help/physmod/sps/ref/clarketransform.html
-    """
-    global data, clarke
-    # Clarke transform
-    clarke_matrix = (2 / 3) * np.array(
-        [
-            [1, -(1 / 2), -(1 / 2)],
-            [0, (np.sqrt(3) / 2), -(np.sqrt(3) / 2)],
-            [(1 / 2), (1 / 2), (1 / 2)],
-        ]
-    )
-    # Clarke transform function
-    clarke = np.dot(
-        clarke_matrix,
-        np.array(
+        # Clarke transform
+        self.clarke_matrix = (2 / 3) * np.array(
             [
-                np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, :] + (time_offset * 2 * np.pi)),
-                np.sin(phaseB_offset + data[PhaseEnum.B, AxisEnum.Y, :] + (time_offset * 2 * np.pi) + _120),
-                np.sin(phaseC_offset + data[PhaseEnum.C, AxisEnum.Y, :] + (time_offset * 2 * np.pi) + _240),
+                [1, -(1 / 2), -(1 / 2)],
+                [0, (np.sqrt(3) / 2), -(np.sqrt(3) / 2)],
+                [(1 / 2), (1 / 2), (1 / 2)],
             ]
         )
-        * np.array([phaseA_amplitude, phaseB_amplitude, phaseC_amplitude])[:, None],
-    )
-    return clarke
 
+        # Park Transform
+        self.park_matrix = np.array(
+            [
+                [
+                    self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :],
+                    -self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :],
+                    self.zeros,
+                ],
+                [
+                    self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :],
+                    self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :],
+                    self.zeros,
+                ],
+                [
+                    self.zeros,
+                    self.zeros,
+                    self.ones,
+                ],
+            ]
+        )
 
-def do_park_transform():
-    """Perform Park transform function.
+        ClarkeParkExploration.INSTANCE = self
 
-    https://de.wikipedia.org/wiki/D/q-Transformation
-    https://www.mathworks.com/help/physmod/sps/ref/clarketoparkangletransform.html
-    """
-    global data, clarke, park
-    # create Park transformation matrix, with reference based on enum value
-    park_matrix = np.array(
+    def generate_three_phase_data(self) -> np.ndarray:
+        t = np.linspace(0, -1, self.sample_count)
+        t_offset = t + self.time_offset
+
+        self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :] = self.phaseA_amplitude * np.cos(
+            self.frequency * TWO_PI * t_offset + (self.phaseA_offset * np.pi)
+        )
+        self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :] = self.phaseA_amplitude * np.sin(
+            self.frequency * TWO_PI * t_offset + (self.phaseA_offset * np.pi)
+        )
+
+        self.three_phase_data[PhaseEnum.B, AxisEnum.Y, :] = self.phaseB_amplitude * np.cos(
+            self.frequency * TWO_PI * t_offset + (self.phaseB_offset * np.pi) - _120
+        )
+        self.three_phase_data[PhaseEnum.B, AxisEnum.Z, :] = self.phaseB_amplitude * np.sin(
+            self.frequency * TWO_PI * t_offset + (self.phaseB_offset * np.pi) - _120
+        )
+
+        self.three_phase_data[PhaseEnum.C, AxisEnum.Y, :] = self.phaseC_amplitude * np.cos(
+            self.frequency * TWO_PI * t_offset + (self.phaseC_offset * np.pi) + _120
+        )
+        self.three_phase_data[PhaseEnum.C, AxisEnum.Z, :] = self.phaseC_amplitude * np.sin(
+            self.frequency * TWO_PI * t_offset + (self.phaseC_offset * np.pi) + _120
+        )
+
+    def do_clarke_transform(self):
+        """Perform Clarke transform function.
+
+        https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_transformation
+        https://www.mathworks.com/help/physmod/sps/ref/clarketransform.html
+        """
+        # Clarke transform function
+        self.clarke_data[:, :] = np.dot(
+            self.clarke_matrix,
+            np.array(
+                [
+                    self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :],
+                    self.three_phase_data[PhaseEnum.B, AxisEnum.Y, :],
+                    self.three_phase_data[PhaseEnum.C, AxisEnum.Y, :],
+                ]
+            ),
+        )
+
+    def do_park_transform(self):
+        """Perform Park transform function.
+
+        https://de.wikipedia.org/wiki/D/q-Transformation
+        https://www.mathworks.com/help/physmod/sps/ref/clarketoparkangletransform.html
+        """
+
+        # create Park transformation matrix, with reference based on enum value
+        self.park_matrix[0, 0, :] = self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :]
+        self.park_matrix[1, 0, :] = -self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :]
+        self.park_matrix[0, 1, :] = self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :]
+        self.park_matrix[1, 1, :] = self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :]
+
+        # perform the matrix math
+        self.park_data = np.einsum(
+            "ijk,ik->jk",
+            self.park_matrix,
+            self.clarke_data,
+        )
+
+    def generate_figure_data(self):
+        self.generate_three_phase_data()
+        self.do_clarke_transform()
+        self.do_park_transform()
+        self.figure_data = {
+            "data": [
+                {
+                    "x": [0, 1],
+                    "y": [-1, 1],
+                    "z": [-1, 1],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "fixed_xyz_range",
+                    "line": {
+                        "width": 0,
+                        "color": "rgba(0,0,0,0)",
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
+                    "y": self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :],
+                    "z": self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Phase A (t)",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseA.value,
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.B, AxisEnum.X, :],
+                    "y": self.three_phase_data[PhaseEnum.B, AxisEnum.Y, :],
+                    "z": self.three_phase_data[PhaseEnum.B, AxisEnum.Z, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Phase B (t)",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseB.value,
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.C, AxisEnum.X, :],
+                    "y": self.three_phase_data[PhaseEnum.C, AxisEnum.Y, :],
+                    "z": self.three_phase_data[PhaseEnum.C, AxisEnum.Z, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Phase C (t)",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseC.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [
+                        0,
+                        self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0],
+                    ],
+                    "z": [
+                        0,
+                        self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0],
+                    ],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Phasor A",
+                    "line": {
+                        "width": WidthEnum.Phasor.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseA.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [
+                        0,
+                        self.three_phase_data[PhaseEnum.B, AxisEnum.Y, 0],
+                    ],
+                    "z": [
+                        0,
+                        self.three_phase_data[PhaseEnum.B, AxisEnum.Z, 0],
+                    ],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Phasor B",
+                    "line": {
+                        "width": WidthEnum.Phasor.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseB.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [
+                        0,
+                        self.three_phase_data[PhaseEnum.C, AxisEnum.Y, 0],
+                    ],
+                    "z": [
+                        0,
+                        self.three_phase_data[PhaseEnum.C, AxisEnum.Z, 0],
+                    ],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Phasor C",
+                    "line": {
+                        "width": WidthEnum.Phasor.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseC.value,
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
+                    "y": self.clarke_data[ClarkeEnum.A, :],
+                    "z": self.zeros,
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Clarke α (t)",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Clarke.value,
+                        "color": ColorEnum.ClarkeA.value,
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
+                    "y": self.zeros,
+                    "z": self.clarke_data[ClarkeEnum.B, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Clarke β (t)",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Clarke.value,
+                        "color": ColorEnum.ClarkeB.value,
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
+                    "y": self.clarke_data[ClarkeEnum.Z, :],
+                    "z": self.clarke_data[ClarkeEnum.Z, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Clarke Zero (t)",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Clarke.value,
+                        "color": ColorEnum.ClarkeZ.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [0, self.clarke_data[ClarkeEnum.A, 0]],
+                    "z": [0, 0],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Clarke α",
+                    "line": {
+                        "width": WidthEnum.Clarke.value,
+                        "dash": DashEnum.Clarke.value,
+                        "color": ColorEnum.ClarkeA.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [0, 0],
+                    "z": [0, self.clarke_data[ClarkeEnum.B, 0]],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Clarke β",
+                    "line": {
+                        "width": WidthEnum.Clarke.value,
+                        "dash": DashEnum.Clarke.value,
+                        "color": ColorEnum.ClarkeB.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [0, self.clarke_data[ClarkeEnum.Z, 0]],
+                    "z": [0, self.clarke_data[ClarkeEnum.Z, 0]],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Clarke Zero ",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Clarke.value,
+                        "color": ColorEnum.ClarkeZ.value,
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
+                    "y": self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.D, :],
+                    "z": self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.D, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Park d (t)",
+                    "line": {
+                        "width": WidthEnum.Park.value,
+                        "dash": DashEnum.Park.value,
+                        "color": ColorEnum.ParkD.value,
+                    },
+                },
+                {
+                    "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
+                    "y": self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.Q, :],
+                    "z": self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.Q, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Park q (t)",
+                    "line": {
+                        "width": WidthEnum.Park.value,
+                        "dash": DashEnum.Park.value,
+                        "color": ColorEnum.ParkQ.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [
+                        0,
+                        self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.D, 0],
+                    ],
+                    "z": [
+                        0,
+                        self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.D, 0],
+                    ],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Park d",
+                    "line": {
+                        "width": WidthEnum.Park.value,
+                        "dash": DashEnum.Park.value,
+                        "color": ColorEnum.ParkD.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [
+                        0,
+                        self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.Q, 0],
+                    ],
+                    "z": [
+                        0,
+                        self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.Q, 0],
+                    ],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Park q",
+                    "line": {
+                        "width": WidthEnum.Park.value,
+                        "dash": DashEnum.Park.value,
+                        "color": ColorEnum.ParkQ.value,
+                    },
+                },
+            ],
+            "layout": {
+                "scene": {
+                    "xaxis": {
+                        "title": "x (Time)",
+                        "tickvals": [-1, 0, 1],
+                    },
+                    "yaxis": {
+                        "title": "y (Real)",
+                        "tickvals": [-1, 0, 1],
+                    },
+                    "zaxis": {
+                        "title": "z (Imaginary)",
+                        "tickvals": [-1, 0, 1],
+                    },
+                },
+                "plot_bgcolor": "rgba(0, 0, 0, 0)",
+                "paper_bgcolor": "rgba(0, 0, 0, 0)",
+            },
+        }
+        if self.first is False:
+            self.figure_data["layout"]["uirevision"] = 1
+            self.figure_data["layout"]["scene"]["aspectratio"] = {
+                "x": 1,
+                "y": 1,
+                "z": 1,
+            }
+            self.figure_data["layout"]["height"] = self.height
+            self.figure_data["layout"]["width"] = self.width
+            self.figure_data["layout"]["margin"] = {
+                "l": margin,
+                "r": margin,
+                "t": margin,
+                "b": margin,
+            }
+
+        else:
+            self.first = False
+            self.figure_data["layout"]["uirevision"] = 1
+            self.figure_data["layout"]["height"] = self.height
+            self.figure_data["layout"]["width"] = self.width
+            self.figure_data["layout"]["scene_aspectmode"] = "cube"
+            self.figure_data["layout"]["autosize"] = False
+            self.figure_data["layout"]["scene"]["aspectmode"] = "manual"
+            self.figure_data["layout"]["scene"]["aspectratio"] = {
+                "x": 1,
+                "y": 1,
+                "z": 1,
+            }
+            self.figure_data["layout"]["margin"] = {
+                "l": margin,
+                "r": margin,
+                "t": margin,
+                "b": margin,
+            }
+
+        if self.focus_selection == FocusAxis.XY:
+            self.figure_data["layout"]["scene"]["camera"] = {
+                "up": {
+                    "x": 0.0,
+                    "y": 0.5,
+                    "z": 0.0,
+                },
+                "eye": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 2.0,
+                },
+            }
+        elif self.focus_selection == FocusAxis.XZ:
+            self.figure_data["layout"]["scene"]["camera"] = {
+                "up": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.5,
+                },
+                "eye": {
+                    "x": 0.0,
+                    "y": -2.0,
+                    "z": 0.0,
+                },
+            }
+        elif self.focus_selection == FocusAxis.YZ:
+            self.figure_data["layout"]["scene"]["camera"] = {
+                "up": {
+                    "x": 0.0,
+                    "y": 0.5,
+                    "z": 0.0,
+                },
+                "eye": {
+                    "x": -2.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                },
+            }
+        elif self.focus_selection == FocusAxis.XYZ:
+            self.figure_data["layout"]["scene"]["camera"] = {
+                "up": {
+                    "x": 0.0,
+                    "y": 0.5,
+                    "z": 0.0,
+                },
+                "eye": {
+                    "x": 1.75,
+                    "y": 1.75,
+                    "z": 1.75,
+                },
+            }
+        self.figure_data["layout"]["scene"]["camera"]["projection"] = {
+            "type": self.projection,
+        }
+
+    @staticmethod
+    @app.callback(
         [
-            [
-                np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, :] + (time_offset * 2 * np.pi)),
-                -np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, :] + (time_offset * 2 * np.pi)),
-                zeros,
-            ],
-            [
-                np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, :] + (time_offset * 2 * np.pi)),
-                np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, :] + (time_offset * 2 * np.pi)),
-                zeros,
-            ],
-            [
-                zeros,
-                zeros,
-                ones,
-            ],
+            Output("scatter_plot", "figure"),
+            Output("three_phase_data", "children"),
+            Output("clarke_data", "children"),
+            Output("park_data", "children"),
+            Output("projection", "label"),
+        ],
+        [
+            Input("time_slider", "value"),
+            Input("frequency_slider", "value"),
+            Input("phaseA_amplitude_slider", "value"),
+            Input("phaseB_amplitude_slider", "value"),
+            Input("phaseC_amplitude_slider", "value"),
+            Input("phaseA_phase_slider", "value"),
+            Input("phaseB_phase_slider", "value"),
+            Input("phaseC_phase_slider", "value"),
+            Input("size_slider", "value"),
+            Input("focus_xy", "n_clicks"),
+            Input("focus_xz", "n_clicks"),
+            Input("focus_yz", "n_clicks"),
+            Input("focus_corner", "n_clicks"),
+            Input("projection", "on"),
+        ],
+    )
+    def update_graphs(
+        time_slider,
+        frequency_slider,
+        phaseA_amplitude_slider,
+        phaseB_amplitude_slider,
+        phaseC_amplitude_slider,
+        phaseA_phase_slider,
+        phaseB_phase_slider,
+        phaseC_phase_slider,
+        size_slider,
+        btn1,
+        btn2,
+        btn3,
+        btn4,
+        projection_isometric,
+    ):
+        self = ClarkeParkExploration.INSTANCE
+        self.time_offset = time_slider
+        self.frequency = frequency_slider
+        self.phaseA_offset = phaseA_phase_slider
+        self.phaseB_offset = phaseB_phase_slider
+        self.phaseC_offset = phaseC_phase_slider
+        self.phaseA_amplitude = phaseA_amplitude_slider
+        self.phaseB_amplitude = phaseB_amplitude_slider
+        self.phaseC_amplitude = phaseC_amplitude_slider
+        self.height = size_slider
+        self.width = size_slider * 1.25
+        if projection_isometric is True:
+            self.projection = "isometric"
+        else:
+            self.projection = "orthographic"
+        self.changed_id = [p["prop_id"] for p in dash.callback_context.triggered][0]
+        if "focus_xy" in self.changed_id:
+            self.focus_selection = FocusAxis.XY
+        elif "focus_xz" in self.changed_id:
+            self.focus_selection = FocusAxis.XZ
+        elif "focus_yz" in self.changed_id:
+            self.focus_selection = FocusAxis.YZ
+        elif "focus_corner" in self.changed_id:
+            self.focus_selection = FocusAxis.XYZ
+        self.generate_figure_data()
+        return [
+            self.figure_data,
+            html.Td(
+                [
+                    html.Tr(
+                        [
+                            html.Td(f"{self.three_phase_data[PhaseEnum.A, AxisEnum.X, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0]:0.2f}\u00A0\u00A0"),
+                        ]
+                    ),
+                    html.Tr(
+                        [
+                            html.Td(f"{self.three_phase_data[PhaseEnum.B, AxisEnum.X, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.B, AxisEnum.Y, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.B, AxisEnum.Z, 0]:0.2f}\u00A0\u00A0"),
+                        ]
+                    ),
+                    html.Tr(
+                        [
+                            html.Td(f"{self.three_phase_data[PhaseEnum.C, AxisEnum.X, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.C, AxisEnum.Y, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.C, AxisEnum.Z, 0]:0.2f}\u00A0\u00A0"),
+                        ]
+                    ),
+                ]
+            ),
+            html.Td(
+                [
+                    html.Tr(
+                        [
+                            html.Td(f"{self.clarke_data[ClarkeEnum.A, 0]:0.2f}"),
+                        ]
+                    ),
+                    html.Tr(
+                        [
+                            html.Td(f"{self.clarke_data[ClarkeEnum.B, 0]:0.2f}"),
+                        ]
+                    ),
+                    html.Tr(
+                        [
+                            html.Td(f"{self.clarke_data[ClarkeEnum.Z, 0]:0.2f}"),
+                        ]
+                    ),
+                ]
+            ),
+            html.Td(
+                [
+                    html.Tr(
+                        [
+                            html.Td(f"{self.park_data[ParkEnum.D, 0]:0.2f}"),
+                        ]
+                    ),
+                    html.Tr(
+                        [
+                            html.Td(f"{self.park_data[ParkEnum.Q, 0]:0.2f}"),
+                        ]
+                    ),
+                    html.Tr(
+                        [
+                            html.Td(f"{self.park_data[ParkEnum.Z, 0]:0.2f}"),
+                        ]
+                    ),
+                ]
+            ),
+            self.projection,
         ]
-    )
-    # perform the matrix math
-    park = np.einsum(
-        "ijk,ik->jk",
-        park_matrix,
-        clarke,
-    )
-    return park
 
 
+cpe = ClarkeParkExploration()
 app.layout = dbc.Container(
     [
         html.H1("Interactive Clarke & Park Transforms"),
@@ -227,7 +765,7 @@ app.layout = dbc.Container(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} \\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ \\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix}\\begin{bmatrix} A_y(t) \\\\ B_y(t) \\\\ C_y(t) \\end{bmatrix} = \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
+                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} \\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ \\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix}\\begin{bmatrix} A_z(t) \\\\ B_z(t) \\\\ C_z(t) \\end{bmatrix} = \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
                     ),
                     html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
                     html.Td(
@@ -268,18 +806,16 @@ app.layout = dbc.Container(
         ),
         html.Div(
             [
-                dcc.Graph(
-                    id="scatter_plot",
-                    style={
-                        "scene_aspectmode": "cube",
-                    },
-                )
-            ],
+                html.P("Use the following controls to change the perspective of the graph."),
+                html.P("Sometimes you have to switch views more than once for plotly to reset any rotation."),
+            ]
         ),
         html.Div(
             [
-                html.P("Use the following controls to change the perspective of the graph."),
-                html.P("Sometimes you have to switch views more than once for plotly to reset any rotation."),
+                html.Button("View X/Y (real / cosine)", id="focus_xy", n_clicks=0),
+                html.Button("View X/Z (imaginary / sine)", id="focus_xz", n_clicks=0),
+                html.Button("View Y/Z (polar)", id="focus_yz", n_clicks=0),
+                html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
             ]
         ),
         html.Div(
@@ -290,165 +826,164 @@ app.layout = dbc.Container(
                 "justify-content": "left",
             },
         ),
-        html.Div(
-            [
-                html.Button("View X/Y (imaginary / sine)", id="focus_xy", n_clicks=0),
-                html.Button("View X/Z (real / cosine)", id="focus_xz", n_clicks=0),
-                html.Button("View Y/Z (polar)", id="focus_yz", n_clicks=0),
-                html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
-            ]
+        dcc.Graph(
+            id="scatter_plot",
+            style={
+                "scene_aspectmode": "cube",
+            },
         ),
-        html.P(),
-        html.Br(),
-        html.Div(
+        html.P(
             [
                 html.P("Use this slider to adjust the time axis by adding an " + "offset from zero to one."),
-                # html.Br(),
                 dcc.Slider(
-                    # daq.Slider(
                     id="time_slider",
                     min=0,
                     max=1,
-                    step=1 / slider_count,
+                    step=1 / cpe.slider_count,
                     value=0,
                     updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
-                html.Br(),
                 html.P("This slider adjusts the frequency of the sine waves (\\(  \\omega \\) )."),
-                # html.Br(),
                 dcc.Slider(
-                    # daq.Slider(
                     id="frequency_slider",
                     min=0.5,
                     max=5,
-                    step=1 / slider_count,
+                    step=1 / cpe.slider_count,
                     value=1,
                     updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
                     },
                 ),
-                html.Br(),
-                html.P("This slider controls Phase A amplitude."),
-                # html.Br(),
-                dcc.Slider(
-                    # daq.Slider(
-                    id="phaseA_amplitude_slider",
-                    min=0.1,
-                    max=2,
-                    step=1 / slider_count,
-                    value=1,
-                    updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
+                html.Table(
+                    html.Tr(
+                        [
+                            html.Td(
+                                [
+                                    html.P("This slider controls Phase the amplitude of A."),
+                                    dcc.Slider(
+                                        id="phaseA_amplitude_slider",
+                                        min=0.1,
+                                        max=2,
+                                        step=1 / cpe.slider_count,
+                                        value=1,
+                                        updatemode="drag",
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Td(
+                                [
+                                    html.P("This slider controls the amplitude of Phase B."),
+                                    dcc.Slider(
+                                        id="phaseB_amplitude_slider",
+                                        min=0.1,
+                                        max=2,
+                                        step=1 / cpe.slider_count,
+                                        value=1,
+                                        updatemode="drag",
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Td(
+                                [
+                                    html.P("This slider controls the amplitude of Phase C."),
+                                    dcc.Slider(
+                                        id="phaseC_amplitude_slider",
+                                        min=0.1,
+                                        max=2,
+                                        step=1 / cpe.slider_count,
+                                        value=1,
+                                        updatemode="drag",
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                    ),
+                                ]
+                            ),
+                        ],
+                    ),
+                    style={"width": "100%"},
                 ),
-                html.Br(),
-                html.P("This slider controls Phase B amplitude."),
-                # html.Br(),
-                dcc.Slider(
-                    # daq.Slider(
-                    id="phaseB_amplitude_slider",
-                    min=0.1,
-                    max=2,
-                    step=1 / slider_count,
-                    value=1,
-                    updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
+                html.Table(
+                    html.Tr(
+                        [
+                            html.Td(
+                                [
+                                    html.P("This slider adds a phase offset to Phase A."),
+                                    dcc.Slider(
+                                        id="phaseA_phase_slider",
+                                        min=-1,
+                                        max=1,
+                                        step=1 / cpe.slider_count,
+                                        value=0,
+                                        updatemode="drag",
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Td(
+                                [
+                                    html.P("This slider adds a phase offset to Phase B."),
+                                    dcc.Slider(
+                                        id="phaseB_phase_slider",
+                                        min=-1,
+                                        max=1,
+                                        step=1 / cpe.slider_count,
+                                        value=0,
+                                        updatemode="drag",
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                    ),
+                                ]
+                            ),
+                            html.Td(
+                                [
+                                    html.P("This slider adds a phase offset to Phase C."),
+                                    dcc.Slider(
+                                        id="phaseC_phase_slider",
+                                        min=-1,
+                                        max=1,
+                                        step=1 / cpe.slider_count,
+                                        value=0,
+                                        updatemode="drag",
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
+                                    ),
+                                ]
+                            ),
+                        ]
+                    ),
+                    style={"width": "100%"},
                 ),
-                html.Br(),
-                html.P("This slider controls Phase C amplitude."),
-                # html.Br(),
-                dcc.Slider(
-                    # daq.Slider(
-                    id="phaseC_amplitude_slider",
-                    min=0.1,
-                    max=2,
-                    step=1 / slider_count,
-                    value=1,
-                    updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.Br(),
-                html.P("This slider adds a phase offset to Phase A."),
-                # html.Br(),
-                dcc.Slider(
-                    # daq.Slider(
-                    id="phaseA_phase_slider",
-                    min=-np.pi,
-                    max=np.pi,
-                    step=1 / slider_count,
-                    value=0,
-                    updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.Br(),
-                html.P("This slider adds a phase offset to Phase B."),
-                # html.Br(),
-                dcc.Slider(
-                    # daq.Slider(
-                    id="phaseB_phase_slider",
-                    min=-np.pi,
-                    max=np.pi,
-                    step=1 / slider_count,
-                    value=0,
-                    updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.Br(),
-                html.P("This slider adds a phase offset to Phase C."),
-                # html.Br(),
-                dcc.Slider(
-                    # daq.Slider(
-                    id="phaseC_phase_slider",
-                    min=-np.pi,
-                    max=np.pi,
-                    step=1 / slider_count,
-                    value=0,
-                    updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.Br(),
                 html.P("This slider adjusts the size of the graphic."),
-                # html.Br(),
                 dcc.Slider(
-                    # daq.Slider(
                     id="size_slider",
                     min=400,
                     max=1600,
-                    step=100,
+                    step=cpe.slider_count,
                     value=700,
                     updatemode="drag",
-                    # handleLabel={"showCurrentValue": True, "label": "VALUE"},
                     tooltip={
                         "placement": "bottom",
                         "always_visible": True,
@@ -458,579 +993,6 @@ app.layout = dbc.Container(
         ),
     ],
 )
-
-
-def generate_figure_data():
-    global data, time_offset, focus_selection, clarke, park, first, projection
-    regen_three_phase_data()
-    do_clarke_transform()
-    do_park_transform()
-    figure_data = {
-        "data": [
-            {
-                "x": [0, 1],
-                "y": [-1, 1],
-                "z": [-1, 1],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "fixed_xyz_range",
-                "line": {
-                    "width": 0,
-                    "color": "rgba(0,0,0,0)",
-                },
-            },
-            {
-                "x": data[PhaseEnum.A, AxisEnum.X, :],
-                "y": phaseA_amplitude
-                * np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, :] + (time_offset * 2 * np.pi)),
-                "z": phaseA_amplitude
-                * np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, :] + (time_offset * 2 * np.pi)),
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Phase A (t)",
-                "line": {
-                    "width": WidthEnum.Time.value,
-                    "dash": DashEnum.Normal.value,
-                    "color": ColorEnum.PhaseA.value,
-                },
-            },
-            {
-                "x": data[PhaseEnum.B, AxisEnum.X, :],
-                "y": phaseB_amplitude
-                * np.sin(phaseB_offset + data[PhaseEnum.B, AxisEnum.Y, :] + (time_offset * 2 * np.pi) + _120),
-                "z": phaseB_amplitude
-                * np.cos(phaseB_offset + data[PhaseEnum.B, AxisEnum.Z, :] + (time_offset * 2 * np.pi) + _120),
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Phase B (t)",
-                "line": {
-                    "width": WidthEnum.Time.value,
-                    "dash": DashEnum.Normal.value,
-                    "color": ColorEnum.PhaseB.value,
-                },
-            },
-            {
-                "x": data[PhaseEnum.C, AxisEnum.X, :],
-                "y": phaseC_amplitude
-                * np.sin(phaseC_offset + data[PhaseEnum.C, AxisEnum.Y, :] + (time_offset * 2 * np.pi) + _240),
-                "z": phaseC_amplitude
-                * np.cos(phaseC_offset + data[PhaseEnum.C, AxisEnum.Z, :] + (time_offset * 2 * np.pi) + _240),
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Phase C (t)",
-                "line": {
-                    "width": WidthEnum.Time.value,
-                    "dash": DashEnum.Normal.value,
-                    "color": ColorEnum.PhaseC.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [
-                    0,
-                    phaseA_amplitude
-                    * np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, 0] + (time_offset * 2 * np.pi)),
-                ],
-                "z": [
-                    0,
-                    phaseA_amplitude
-                    * np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, 0] + (time_offset * 2 * np.pi)),
-                ],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Phasor A",
-                "line": {
-                    "width": WidthEnum.Phasor.value,
-                    "dash": DashEnum.Normal.value,
-                    "color": ColorEnum.PhaseA.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [
-                    0,
-                    phaseB_amplitude
-                    * np.sin(
-                        phaseB_offset + data[PhaseEnum.B, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _120
-                    ),
-                ],
-                "z": [
-                    0,
-                    phaseB_amplitude
-                    * np.cos(
-                        phaseB_offset + data[PhaseEnum.B, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _120
-                    ),
-                ],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Phasor B",
-                "line": {
-                    "width": WidthEnum.Phasor.value,
-                    "dash": DashEnum.Normal.value,
-                    "color": ColorEnum.PhaseB.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [
-                    0,
-                    phaseC_amplitude
-                    * np.sin(
-                        phaseC_offset + data[PhaseEnum.C, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _240
-                    ),
-                ],
-                "z": [
-                    0,
-                    phaseC_amplitude
-                    * np.cos(
-                        phaseC_offset + data[PhaseEnum.C, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _240
-                    ),
-                ],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Phasor C",
-                "line": {
-                    "width": WidthEnum.Phasor.value,
-                    "dash": DashEnum.Normal.value,
-                    "color": ColorEnum.PhaseC.value,
-                },
-            },
-            {
-                "x": data[PhaseEnum.A, AxisEnum.X, :],
-                "y": clarke[ClarkeEnum.A, :],
-                "z": zeros,
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Clarke α (t)",
-                "line": {
-                    "width": WidthEnum.Time.value,
-                    "dash": DashEnum.Clarke.value,
-                    "color": ColorEnum.ClarkeA.value,
-                },
-            },
-            {
-                "x": data[PhaseEnum.A, AxisEnum.X, :],
-                "y": zeros,
-                "z": clarke[ClarkeEnum.B, :],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Clarke β (t)",
-                "line": {
-                    "width": WidthEnum.Time.value,
-                    "dash": DashEnum.Clarke.value,
-                    "color": ColorEnum.ClarkeB.value,
-                },
-            },
-            {
-                "x": data[PhaseEnum.A, AxisEnum.X, :],
-                "y": clarke[ClarkeEnum.Z, :],
-                "z": clarke[ClarkeEnum.Z, :],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Clarke Zero (t)",
-                "line": {
-                    "width": WidthEnum.Time.value,
-                    "dash": DashEnum.Clarke.value,
-                    "color": ColorEnum.ClarkeZ.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [0, clarke[ClarkeEnum.A, 0]],
-                "z": [0, 0],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Clarke α",
-                "line": {
-                    "width": WidthEnum.Clarke.value,
-                    "dash": DashEnum.Clarke.value,
-                    "color": ColorEnum.ClarkeA.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [0, 0],
-                "z": [0, clarke[ClarkeEnum.B, 0]],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Clarke β",
-                "line": {
-                    "width": WidthEnum.Clarke.value,
-                    "dash": DashEnum.Clarke.value,
-                    "color": ColorEnum.ClarkeB.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [0, clarke[ClarkeEnum.Z, 0]],
-                "z": [0, clarke[ClarkeEnum.Z, 0]],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Clarke Zero ",
-                "line": {
-                    "width": WidthEnum.Time.value,
-                    "dash": DashEnum.Clarke.value,
-                    "color": ColorEnum.ClarkeZ.value,
-                },
-            },
-            {
-                "x": data[PhaseEnum.A, AxisEnum.X, :],
-                "y": np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, 0] + (time_offset * 2 * np.pi))
-                * park[ParkEnum.D, :],
-                "z": np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, 0] + (time_offset * 2 * np.pi))
-                * park[ParkEnum.D, :],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Park d (t)",
-                "line": {
-                    "width": WidthEnum.Park.value,
-                    "dash": DashEnum.Park.value,
-                    "color": ColorEnum.ParkD.value,
-                },
-            },
-            {
-                "x": data[PhaseEnum.A, AxisEnum.X, :],
-                "y": np.sin(
-                    phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + (np.pi / 2)
-                )
-                * park[ParkEnum.Q, :],
-                "z": np.cos(
-                    phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + (np.pi / 2)
-                )
-                * park[ParkEnum.Q, :],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Park q (t)",
-                "line": {
-                    "width": WidthEnum.Park.value,
-                    "dash": DashEnum.Park.value,
-                    "color": ColorEnum.ParkQ.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [
-                    0,
-                    np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, 0] + (time_offset * 2 * np.pi))
-                    * park[ParkEnum.D, 0],
-                ],
-                "z": [
-                    0,
-                    np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, 0] + (time_offset * 2 * np.pi))
-                    * park[ParkEnum.D, 0],
-                ],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Park d",
-                "line": {
-                    "width": WidthEnum.Park.value,
-                    "dash": DashEnum.Park.value,
-                    "color": ColorEnum.ParkD.value,
-                },
-            },
-            {
-                "x": [0, 0],
-                "y": [
-                    0,
-                    np.sin(
-                        phaseA_offset
-                        + data[PhaseEnum.A, AxisEnum.Y, 0]
-                        + (time_offset * 2 * np.pi)
-                        + (np.pi / 2)
-                    )
-                    * park[ParkEnum.Q, 0],
-                ],
-                "z": [
-                    0,
-                    np.cos(
-                        phaseA_offset
-                        + data[PhaseEnum.A, AxisEnum.Z, 0]
-                        + (time_offset * 2 * np.pi)
-                        + (np.pi / 2)
-                    )
-                    * park[ParkEnum.Q, 0],
-                ],
-                "type": "scatter3d",
-                "mode": "lines",
-                "name": "Park q",
-                "line": {
-                    "width": WidthEnum.Park.value,
-                    "dash": DashEnum.Park.value,
-                    "color": ColorEnum.ParkQ.value,
-                },
-            },
-        ],
-        "layout": {
-            "scene": {
-                "xaxis": {
-                    "title": "x (Time)",
-                    "tickvals": [-1, 0, 1],
-                },
-                "yaxis": {
-                    "title": "y (Real)",
-                    "tickvals": [-1, 0, 1],
-                },
-                "zaxis": {
-                    "title": "z (Imaginary)",
-                    "tickvals": [-1, 0, 1],
-                },
-            },
-            "plot_bgcolor": "rgba(0, 0, 0, 0)",
-            "paper_bgcolor": "rgba(0, 0, 0, 0)",
-        },
-    }
-    if first is False:
-        figure_data["layout"]["uirevision"] = 1
-        figure_data["layout"]["scene"]["aspectratio"] = {
-            "x": 1,
-            "y": 1,
-            "z": 1,
-        }
-        figure_data["layout"]["height"] = height
-        figure_data["layout"]["width"] = width
-        figure_data["layout"]["margin"] = {
-            "l": margin,
-            "r": margin,
-            "t": margin,
-            "b": margin,
-        }
-
-    else:
-        first = False
-        figure_data["layout"]["uirevision"] = 1
-        figure_data["layout"]["height"] = height
-        figure_data["layout"]["width"] = width
-        figure_data["layout"]["scene_aspectmode"] = "cube"
-        figure_data["layout"]["autosize"] = False
-        figure_data["layout"]["scene"]["aspectmode"] = "manual"
-        figure_data["layout"]["scene"]["aspectratio"] = {
-            "x": 1,
-            "y": 1,
-            "z": 1,
-        }
-        figure_data["layout"]["margin"] = {
-            "l": margin,
-            "r": margin,
-            "t": margin,
-            "b": margin,
-        }
-
-    if focus_selection == FocusAxis.XY:
-        figure_data["layout"]["scene"]["camera"] = {
-            "up": {
-                "x": 0.0,
-                "y": 0.5,
-                "z": 0.0,
-            },
-            "eye": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 2.0,
-            },
-        }
-    elif focus_selection == FocusAxis.XZ:
-        figure_data["layout"]["scene"]["camera"] = {
-            "up": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 0.5,
-            },
-            "eye": {
-                "x": 0.0,
-                "y": -2.0,
-                "z": 0.0,
-            },
-        }
-    elif focus_selection == FocusAxis.YZ:
-        figure_data["layout"]["scene"]["camera"] = {
-            "up": {
-                "x": 0.0,
-                "y": 0.5,
-                "z": 0.0,
-            },
-            "eye": {
-                "x": -2.0,
-                "y": 0.0,
-                "z": 0.0,
-            },
-        }
-    elif focus_selection == FocusAxis.XYZ:
-        figure_data["layout"]["scene"]["camera"] = {
-            "up": {
-                "x": 0.0,
-                "y": 0.5,
-                "z": 0.0,
-            },
-            "eye": {
-                "x": 1.75,
-                "y": 1.75,
-                "z": 1.75,
-            },
-        }
-    figure_data["layout"]["scene"]["camera"]["projection"] = {
-        "type": projection,
-    }
-
-    # focus_selection = FocusAxis.NONE
-
-    return figure_data
-
-
-@app.callback(
-    # Output("scatter_plot", "figure"),
-    [
-        Output("scatter_plot", "figure"),
-        Output("three_phase_data", "children"),
-        Output("clarke_data", "children"),
-        Output("park_data", "children"),
-        Output("projection", "label"),
-    ],
-    [
-        Input("time_slider", "value"),
-        Input("frequency_slider", "value"),
-        Input("phaseA_amplitude_slider", "value"),
-        # Input("phaseB_amplitude_slider", "value"),
-        # Input("phaseC_amplitude_slider", "value"),
-        Input("phaseA_phase_slider", "value"),
-        # Input("phaseB_phase_slider", "value"),
-        # Input("phaseC_phase_slider", "value"),
-        Input("size_slider", "value"),
-        Input("focus_xy", "n_clicks"),
-        Input("focus_xz", "n_clicks"),
-        Input("focus_yz", "n_clicks"),
-        Input("focus_corner", "n_clicks"),
-        Input("projection", "on"),
-    ],
-)
-def update_graphs(
-    time_slider,
-    frequency_slider,
-    phaseA_amplitude_slider,
-    # phaseB_amplitude_slider,
-    # phaseC_amplitude_slider,
-    phaseA_phase_slider,
-    # phaseB_phase_slider,
-    # phaseC_phase_slider,
-    size_slider,
-    btn1,
-    btn2,
-    btn3,
-    btn4,
-    projection_isometric,
-):
-    global time_offset, phaseA_amplitude, phaseB_amplitude, phaseC_amplitude, phaseA_offset, phaseB_offset, phaseC_offset, focus_selection, height, width, clarke, park, projection, frequency
-    time_offset = time_slider
-    frequency = frequency_slider
-    phaseA_offset = phaseA_phase_slider
-    # phaseB_offset = phaseB_phase_slider
-    phaseB_offset = 0
-    # phaseC_offset = phaseC_phase_slider
-    phaseC_offset = 0
-    phaseA_amplitude = phaseA_amplitude_slider
-    # phaseB_amplitude = phaseB_amplitude_slider
-    phaseB_amplitude = 1
-    # phaseC_amplitude = phaseC_amplitude_slider
-    phaseC_amplitude = 1
-    height = size_slider
-    width = size_slider * 1.25
-    if projection_isometric is True:
-        projection = "isometric"
-    else:
-        projection = "orthographic"
-    changed_id = [p["prop_id"] for p in dash.callback_context.triggered][0]
-    if "focus_xy" in changed_id:
-        focus_selection = FocusAxis.XY
-    elif "focus_xz" in changed_id:
-        focus_selection = FocusAxis.XZ
-    elif "focus_yz" in changed_id:
-        focus_selection = FocusAxis.YZ
-    elif "focus_corner" in changed_id:
-        focus_selection = FocusAxis.XYZ
-    return [
-        generate_figure_data(),
-        html.Td(
-            [
-                html.Tr(
-                    [
-                        html.Td(
-                            f"{phaseA_offset + data[PhaseEnum.A, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}\u00A0\u00A0"
-                        ),
-                        html.Td(
-                            f"{phaseA_amplitude * np.sin(phaseA_offset + data[PhaseEnum.A, AxisEnum.Y, 0] + (time_offset * 2 * np.pi)):0.2f}\u00A0\u00A0"
-                        ),
-                        html.Td(
-                            f"{phaseA_amplitude * np.cos(phaseA_offset + data[PhaseEnum.A, AxisEnum.Z, 0] + (time_offset * 2 * np.pi)):0.2f}\u00A0\u00A0"
-                        ),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(
-                            f"{phaseB_offset + data[PhaseEnum.B, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}\u00A0\u00A0"
-                        ),
-                        html.Td(
-                            f"{phaseB_amplitude * np.sin(phaseB_offset + data[PhaseEnum.B, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _120):0.2f}\u00A0\u00A0"
-                        ),
-                        html.Td(
-                            f"{phaseB_amplitude * np.cos(phaseB_offset + data[PhaseEnum.B, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _120):0.2f}\u00A0\u00A0"
-                        ),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(
-                            f"{phaseC_offset + data[PhaseEnum.C, AxisEnum.X, 0] + (time_offset * 2 * np.pi):0.2f}\u00A0\u00A0"
-                        ),
-                        html.Td(
-                            f"{phaseC_amplitude * np.sin(phaseC_offset + data[PhaseEnum.C, AxisEnum.Y, 0] + (time_offset * 2 * np.pi) + _240):0.2f}\u00A0\u00A0"
-                        ),
-                        html.Td(
-                            f"{phaseC_amplitude * np.cos(phaseC_offset + data[PhaseEnum.C, AxisEnum.Z, 0] + (time_offset * 2 * np.pi) + _240):0.2f}\u00A0\u00A0"
-                        ),
-                    ]
-                ),
-            ]
-        ),
-        html.Td(
-            [
-                html.Tr(
-                    [
-                        html.Td(f"{clarke[ClarkeEnum.A, 0]:0.2f}"),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(f"{clarke[ClarkeEnum.B, 0]:0.2f}"),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(f"{clarke[ClarkeEnum.Z, 0]:0.2f}"),
-                    ]
-                ),
-            ]
-        ),
-        html.Td(
-            [
-                html.Tr(
-                    [
-                        html.Td(f"{park[ParkEnum.D, 0]:0.2f}"),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(f"{park[ParkEnum.Q, 0]:0.2f}"),
-                    ]
-                ),
-                html.Tr(
-                    [
-                        html.Td(f"{park[ParkEnum.Z, 0]:0.2f}"),
-                    ]
-                ),
-            ]
-        ),
-        projection,
-    ]
 
 
 app.run_server(debug=True)

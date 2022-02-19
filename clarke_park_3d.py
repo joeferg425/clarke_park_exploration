@@ -2,6 +2,9 @@
 
 The Transforms of three-phase helixes allow user interaction with a variety
 of functions variables.
+
+Author: joe f.
+GitHub: https://github.com/joeferg425
 """
 from typing import Any
 import numpy as np

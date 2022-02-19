@@ -22,7 +22,7 @@ This repository is meant to hold example code for interacting with these equatio
     python clarke_park_3d.py
     ```
 
-1. Open a browser to http://localhost:8050
+1. Open a browser to [http://localhost:8050](http://localhost:8050)
 
 #### View Equations ####
 

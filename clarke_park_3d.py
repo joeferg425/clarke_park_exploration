@@ -1,3 +1,8 @@
+"""This python script plots the Clarke and Park Transforms.
+
+The Transforms of three-phase helixes allow user interaction with a variety
+of functions variables.
+"""
 from typing import Any
 import numpy as np
 import dash
@@ -10,24 +15,48 @@ import dash_daq as daq
 
 
 class AxisEnum(IntEnum):
+    """Enumeration of axis indices.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
     X = 0
     Y = 1
     Z = 2
 
 
 class PhaseEnum(IntEnum):
+    """Enumeration of phase indices.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
     A = 0
     B = 1
     C = 2
 
 
 class ClarkeEnum(IntEnum):
+    """Enumeration of Clarke matrix indices.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
     A = 0
     B = 1
     Z = 2
 
 
 class ParkEnum(IntEnum):
+    """Enumeration of Park matrix indices.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
     D = 0
     Q = 1
     Z = 2
@@ -51,12 +80,24 @@ class ColorEnum(Enum):
 
 
 class DashEnum(Enum):
+    """Enumeration of line formats.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
     Normal = "solid"
     Clarke = "dot"
     Park = "dash"
 
 
 class WidthEnum(Enum):
+    """Enumeration of line widths.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
     Time = 3
     Phasor = 7
     Clarke = 9
@@ -64,6 +105,12 @@ class WidthEnum(Enum):
 
 
 class FocusAxis(IntEnum):
+    """Enumeration of views.
+
+    Args:
+        IntEnum: enumeration value
+    """
+
     XY = 0
     XZ = 1
     YZ = 2
@@ -101,9 +148,12 @@ fig = None
 
 
 class ClarkeParkExploration:
+    """This class defines the controls and graphs of the Clarke and Park transforms."""
+
     INSTANCE: "ClarkeParkExploration"
 
     def __init__(self) -> None:
+        """Create instance of class for use in plots and updates."""
         self.frequency: float = 1.0
         self.sample_count: int = 100
         self.slider_count: int = 100
@@ -166,7 +216,8 @@ class ClarkeParkExploration:
 
         ClarkeParkExploration.INSTANCE = self
 
-    def generate_three_phase_data(self) -> np.ndarray:
+    def generate_three_phase_data(self) -> None:
+        """Create three 3D helixes 120 degrees offset from each other."""
         self.time_plus_offset = self.time + self.time_offset
 
         self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :] = self.phaseA_amplitude * np.cos(
@@ -208,13 +259,12 @@ class ClarkeParkExploration:
             ),
         )
 
-    def do_park_transform(self):
+    def do_park_transform(self) -> None:
         """Perform Park transform function.
 
         https://de.wikipedia.org/wiki/D/q-Transformation
         https://www.mathworks.com/help/physmod/sps/ref/clarketoparkangletransform.html
         """
-
         # create Park transformation matrix, with reference based on enum value
         self.park_matrix[0, 0, :] = self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :]
         self.park_matrix[1, 0, :] = -self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :]
@@ -228,7 +278,8 @@ class ClarkeParkExploration:
             self.clarke_data,
         )
 
-    def generate_figure_data(self):
+    def generate_figure_data(self) -> None:
+        """Create plotly data structure used to update web page in callback."""
         self.generate_three_phase_data()
         self.do_clarke_transform()
         self.do_park_transform()
@@ -677,6 +728,29 @@ class ClarkeParkExploration:
         projection_isometric,
         run_mode,
     ):
+        """Callback function used by plotly when use interacts with controls.
+
+        Args:
+            interval: _description_
+            time_slider: _description_
+            frequency_slider: _description_
+            phaseA_amplitude_slider: _description_
+            phaseB_amplitude_slider: _description_
+            phaseC_amplitude_slider: _description_
+            phaseA_phase_slider: _description_
+            phaseB_phase_slider: _description_
+            phaseC_phase_slider: _description_
+            size_slider: _description_
+            btn1: _description_
+            btn2: _description_
+            btn3: _description_
+            btn4: _description_
+            projection_isometric: _description_
+            run_mode: _description_
+
+        Returns:
+            dictionary of objects for plotly's consumption
+        """
         self = ClarkeParkExploration.INSTANCE
         self.time_offset = time_slider
         self.frequency = frequency_slider
@@ -817,7 +891,11 @@ app.layout = dbc.Container(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\begin{bmatrix}  A_x(t) & A_y(t) & A_z(t) \\\\ B_x(t) & B_y(t) & B_z(t) \\\\ C_x(t) & C_y(t) & C_z(t)  \\end{bmatrix} = \\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} $$"
+                        "$$ \\begin{bmatrix}  A_x(t) & A_y(t) & A_z(t) \\\\ B_x(t) & B_y(t) & B_z(t) "
+                        + "\\\\ C_x(t) & C_y(t) & C_z(t)  \\end{bmatrix} = "
+                        + "\\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & "
+                        + "cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & "
+                        + "cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} $$"
                     ),
                     html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
                     html.Td(
@@ -826,7 +904,9 @@ app.layout = dbc.Container(
                                 "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 For t = time slider below."
                             ),
                             html.P(
-                                "$$ \\begin{bmatrix}  A_x(slider) & A_y(slider) & A_z(slider) \\\\ B_x(slider) & B_y(slider) & B_z(slider) \\\\ C_x(slider) & C_y(slider) & C_z(slider) \\end{bmatrix} = $$"
+                                "$$ \\begin{bmatrix}  A_x(slider) & A_y(slider) & A_z(slider) \\\\ "
+                                + "B_x(slider) & B_y(slider) & B_z(slider) \\\\ C_x(slider) & "
+                                + "C_y(slider) & C_z(slider) \\end{bmatrix} = $$"
                             ),
                         ]
                     ),
@@ -839,7 +919,11 @@ app.layout = dbc.Container(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} \\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ \\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix}\\begin{bmatrix} A_z(t) \\\\ B_z(t) \\\\ C_z(t) \\end{bmatrix} = \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
+                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} "
+                        + "\\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ "
+                        + "\\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix} "
+                        + " \\begin{bmatrix} A_z(t) \\\\ B_z(t) \\\\ C_z(t) \\end{bmatrix} ="
+                        + " \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
                     ),
                     html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
                     html.Td(
@@ -848,7 +932,8 @@ app.layout = dbc.Container(
                                 "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 For t = time slider below."
                             ),
                             html.P(
-                                "$$ \\begin{bmatrix}  \\alpha(slider) \\\\ \\beta(slider)  \\\\ Z_{C}(slider) \\end{bmatrix} = $$",
+                                "$$ \\begin{bmatrix}  \\alpha(slider) \\\\ \\beta(slider) "
+                                + " \\\\ Z_{C}(slider) \\end{bmatrix} = $$",
                             ),
                         ]
                     ),
@@ -861,7 +946,10 @@ app.layout = dbc.Container(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\begin{bmatrix} sin(\\omega t) & -cos(\\omega t) & 0 \\\\ cos(\\omega t) & sin(\\omega t) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} \\begin{bmatrix} \\alpha(t) \\\\ \\beta(t) \\\\ Z_{C}(t) \\end{bmatrix} = \\begin{bmatrix} d(t) \\\\ q(t) \\\\ Z_{P}(t) \\end{bmatrix} $$"
+                        "$$ \\begin{bmatrix} sin(\\omega t) & -cos(\\omega t) & 0 \\\\ "
+                        + "cos(\\omega t) & sin(\\omega t) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} "
+                        + " \\begin{bmatrix} \\alpha(t) \\\\ \\beta(t) \\\\ Z_{C}(t) \\end{bmatrix} = "
+                        + "\\begin{bmatrix} d(t) \\\\ q(t) \\\\ Z_{P}(t) \\end{bmatrix} $$"
                     ),
                     html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
                     html.Td(
@@ -870,7 +958,8 @@ app.layout = dbc.Container(
                                 "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 For t = time slider below."
                             ),
                             html.P(
-                                "$$ \\begin{bmatrix} d(slider) \\\\ q(slider) \\\\ Z_{P}(slider) \\end{bmatrix} = $$"
+                                "$$ \\begin{bmatrix} d(slider) \\\\ q(slider) \\\\ "
+                                + "Z_{P}(slider) \\end{bmatrix} = $$"
                             ),
                         ]
                     ),

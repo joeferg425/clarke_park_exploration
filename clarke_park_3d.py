@@ -117,7 +117,9 @@ class ClarkeParkExploration:
         self.ones3 = np.zeros((3, self.sample_count))
         self.height = 800
         self.width = self.height * 1.25
-        self.projection = "isometric"
+        self.projection = ""
+        self.projection_label = ""
+        self.run_mode = ""
         self.time_offset = 0
         self.frequency = 1
         self.phaseA_offset = 0
@@ -634,8 +636,11 @@ class ClarkeParkExploration:
             Output("clarke_data", "children"),
             Output("park_data", "children"),
             Output("projection", "label"),
+            Output("run-mode", "label"),
+            Output("time_slider", "value"),
         ],
         [
+            Input("interval-component", "n_intervals"),
             Input("time_slider", "value"),
             Input("frequency_slider", "value"),
             Input("phaseA_amplitude_slider", "value"),
@@ -650,9 +655,11 @@ class ClarkeParkExploration:
             Input("focus_yz", "n_clicks"),
             Input("focus_corner", "n_clicks"),
             Input("projection", "on"),
+            Input("run-mode", "on"),
         ],
     )
     def update_graphs(
+        interval,
         time_slider,
         frequency_slider,
         phaseA_amplitude_slider,
@@ -667,6 +674,7 @@ class ClarkeParkExploration:
         btn3,
         btn4,
         projection_isometric,
+        run_mode,
     ):
         self = ClarkeParkExploration.INSTANCE
         self.time_offset = time_slider
@@ -679,10 +687,19 @@ class ClarkeParkExploration:
         self.phaseC_amplitude = phaseC_amplitude_slider
         self.height = size_slider
         self.width = size_slider * 1.25
-        if projection_isometric is True:
+        if projection_isometric is False:
             self.projection = "isometric"
+            self.projection_label = "Enable Orthographic Projection"
         else:
             self.projection = "orthographic"
+            self.projection_label = "Disable Orthographic Projection"
+        if run_mode is True:
+            self.run_mode = "Disable Continuous Mode"
+            self.time_offset += 1.0 / self.slider_count
+            if self.time_offset > 1:
+                self.time_offset = 0
+        else:
+            self.run_mode = "Enable Continuous Mode"
         self.changed_id = [p["prop_id"] for p in dash.callback_context.triggered][0]
         if "focus_xy" in self.changed_id:
             self.focus_selection = FocusAxis.XY
@@ -758,7 +775,9 @@ class ClarkeParkExploration:
                     ),
                 ]
             ),
-            self.projection,
+            self.projection_label,
+            self.run_mode,
+            self.time_offset,
         ]
 
 
@@ -862,6 +881,26 @@ app.layout = dbc.Container(
                 html.P("Sometimes you have to switch views more than once for plotly to reset any rotation."),
             ]
         ),
+        html.Table(
+            html.Tr(
+                [
+                    html.Td(
+                        daq.BooleanSwitch(
+                            id="projection", on=False, label="Isometric Projection", labelPosition="top"
+                        ),
+                    ),
+                    html.Td(
+                        html.P("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
+                    ),
+                    html.Td(
+                        daq.BooleanSwitch(
+                            id="run-mode", on=False, label="Enable Continuous Mode", labelPosition="top"
+                        ),
+                    ),
+                ]
+            )
+        ),
+        html.P(),
         html.Div(
             [
                 html.Button("View X/Y (real / cosine)", id="focus_xy", n_clicks=0),
@@ -870,14 +909,7 @@ app.layout = dbc.Container(
                 html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
             ]
         ),
-        html.Div(
-            daq.BooleanSwitch(id="projection", on=True, label="Isometric", labelPosition="top"),
-            style={
-                "display": "flex",
-                "align-items": "left",
-                "justify-content": "left",
-            },
-        ),
+        html.P(),
         html.H3("Graph"),
         dcc.Graph(
             id="scatter_plot",
@@ -1053,6 +1085,7 @@ app.layout = dbc.Container(
                     },
                 ),
                 html.P(id="ignore"),
+                dcc.Interval(id="interval-component", interval=250, n_intervals=0),
             ]
         ),
     ],

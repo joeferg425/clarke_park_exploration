@@ -71,7 +71,7 @@ class FocusAxis(IntEnum):
     NONE = 4
 
 
-DEBUG = True
+DEBUG = False
 
 app = dash.Dash(
     __name__,
@@ -637,6 +637,7 @@ class ClarkeParkExploration:
             Output("park_data", "children"),
             Output("projection", "label"),
             Output("run-mode", "label"),
+            Output("interval-component", "max_intervals"),
             Output("time_slider", "value"),
         ],
         [
@@ -695,11 +696,13 @@ class ClarkeParkExploration:
             self.projection_label = "Disable Orthographic Projection"
         if run_mode is True:
             self.run_mode = "Disable Continuous Mode"
+            max_intervals = 10000000
             self.time_offset += 1.0 / self.slider_count
             if self.time_offset > 1:
                 self.time_offset = 0
         else:
             self.run_mode = "Enable Continuous Mode"
+            max_intervals = 0
         self.changed_id = [p["prop_id"] for p in dash.callback_context.triggered][0]
         if "focus_xy" in self.changed_id:
             self.focus_selection = FocusAxis.XY
@@ -777,6 +780,7 @@ class ClarkeParkExploration:
             ),
             self.projection_label,
             self.run_mode,
+            max_intervals,
             self.time_offset,
         ]
 
@@ -1085,7 +1089,7 @@ app.layout = dbc.Container(
                     },
                 ),
                 html.P(id="ignore"),
-                dcc.Interval(id="interval-component", interval=250, n_intervals=0),
+                dcc.Interval(id="interval-component", interval=250, n_intervals=0, max_intervals=0),
             ]
         ),
     ],

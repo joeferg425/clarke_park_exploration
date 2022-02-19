@@ -3,7 +3,7 @@ import numpy as np
 import dash
 from dash import dcc
 from dash import html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, ClientsideFunction
 from enum import IntEnum, Enum
 import dash_bootstrap_components as dbc
 import dash_daq as daq
@@ -71,6 +71,8 @@ class FocusAxis(IntEnum):
     NONE = 4
 
 
+DEBUG = True
+
 app = dash.Dash(
     __name__,
     title="Clarke & Park Transforms",
@@ -80,6 +82,11 @@ app = dash.Dash(
             "type": "text/javascript",
             "id": "MathJax-script",
             "src": "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML",
+        },
+        {
+            "type": "text/javascript",
+            "id": "MathJax-callback",
+            "src": "assets/mathjax.js",
         },
     ],
 )
@@ -121,6 +128,7 @@ class ClarkeParkExploration:
         self.phaseC_amplitude = 0
         self.changed_id: Any = None
         self.focus_selection: FocusAxis = FocusAxis.XYZ
+        self.time = np.linspace(0, -1, self.sample_count)
 
         self.first = True
 
@@ -157,28 +165,27 @@ class ClarkeParkExploration:
         ClarkeParkExploration.INSTANCE = self
 
     def generate_three_phase_data(self) -> np.ndarray:
-        t = np.linspace(0, -1, self.sample_count)
-        t_offset = t + self.time_offset
+        self.time_plus_offset = self.time + self.time_offset
 
         self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :] = self.phaseA_amplitude * np.cos(
-            self.frequency * TWO_PI * t_offset + (self.phaseA_offset * np.pi)
+            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseA_offset * np.pi)
         )
         self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :] = self.phaseA_amplitude * np.sin(
-            self.frequency * TWO_PI * t_offset + (self.phaseA_offset * np.pi)
+            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseA_offset * np.pi)
         )
 
         self.three_phase_data[PhaseEnum.B, AxisEnum.Y, :] = self.phaseB_amplitude * np.cos(
-            self.frequency * TWO_PI * t_offset + (self.phaseB_offset * np.pi) - _120
+            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseB_offset * np.pi) - _120
         )
         self.three_phase_data[PhaseEnum.B, AxisEnum.Z, :] = self.phaseB_amplitude * np.sin(
-            self.frequency * TWO_PI * t_offset + (self.phaseB_offset * np.pi) - _120
+            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseB_offset * np.pi) - _120
         )
 
         self.three_phase_data[PhaseEnum.C, AxisEnum.Y, :] = self.phaseC_amplitude * np.cos(
-            self.frequency * TWO_PI * t_offset + (self.phaseC_offset * np.pi) + _120
+            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseC_offset * np.pi) + _120
         )
         self.three_phase_data[PhaseEnum.C, AxisEnum.Z, :] = self.phaseC_amplitude * np.sin(
-            self.frequency * TWO_PI * t_offset + (self.phaseC_offset * np.pi) + _120
+            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseC_offset * np.pi) + _120
         )
 
     def do_clarke_transform(self):
@@ -413,8 +420,18 @@ class ClarkeParkExploration:
                 },
                 {
                     "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
-                    "y": self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.D, :],
-                    "z": self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.D, :],
+                    "y": np.cos(
+                        self.frequency * TWO_PI * self.time_plus_offset[0]
+                        + (self.phaseA_offset * np.pi)
+                        + (np.pi / 2)
+                    )
+                    * self.park_data[ParkEnum.D, :],
+                    "z": np.sin(
+                        self.frequency * TWO_PI * self.time_plus_offset[0]
+                        + (self.phaseA_offset * np.pi)
+                        + (np.pi / 2)
+                    )
+                    * self.park_data[ParkEnum.D, :],
                     "type": "scatter3d",
                     "mode": "lines",
                     "name": "Park d (t)",
@@ -426,8 +443,14 @@ class ClarkeParkExploration:
                 },
                 {
                     "x": self.three_phase_data[PhaseEnum.A, AxisEnum.X, :],
-                    "y": self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.Q, :],
-                    "z": self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.Q, :],
+                    "y": np.cos(
+                        self.frequency * TWO_PI * self.time_plus_offset[0] + (self.phaseA_offset * np.pi)
+                    )
+                    * self.park_data[ParkEnum.Q, :],
+                    "z": np.sin(
+                        self.frequency * TWO_PI * self.time_plus_offset[0] + (self.phaseA_offset * np.pi)
+                    )
+                    * self.park_data[ParkEnum.Q, :],
                     "type": "scatter3d",
                     "mode": "lines",
                     "name": "Park q (t)",
@@ -441,11 +464,21 @@ class ClarkeParkExploration:
                     "x": [0, 0],
                     "y": [
                         0,
-                        self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.D, 0],
+                        np.cos(
+                            self.frequency * TWO_PI * self.time_plus_offset[0]
+                            + (self.phaseA_offset * np.pi)
+                            + (np.pi / 2)
+                        )
+                        * self.park_data[ParkEnum.D, 0],
                     ],
                     "z": [
                         0,
-                        self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.D, 0],
+                        np.sin(
+                            self.frequency * TWO_PI * self.time_plus_offset[0]
+                            + (self.phaseA_offset * np.pi)
+                            + (np.pi / 2)
+                        )
+                        * self.park_data[ParkEnum.D, 0],
                     ],
                     "type": "scatter3d",
                     "mode": "lines",
@@ -460,11 +493,17 @@ class ClarkeParkExploration:
                     "x": [0, 0],
                     "y": [
                         0,
-                        self.three_phase_data[PhaseEnum.A, AxisEnum.Y, 0] * self.park_data[ParkEnum.Q, 0],
+                        np.cos(
+                            self.frequency * TWO_PI * self.time_plus_offset[0] + (self.phaseA_offset * np.pi)
+                        )
+                        * self.park_data[ParkEnum.Q, 0],
                     ],
                     "z": [
                         0,
-                        self.three_phase_data[PhaseEnum.A, AxisEnum.Z, 0] * self.park_data[ParkEnum.Q, 0],
+                        np.sin(
+                            self.frequency * TWO_PI * self.time_plus_offset[0] + (self.phaseA_offset * np.pi)
+                        )
+                        * self.park_data[ParkEnum.Q, 0],
                     ],
                     "type": "scatter3d",
                     "mode": "lines",
@@ -729,14 +768,26 @@ app.layout = dbc.Container(
         html.H1("Interactive Clarke & Park Transforms"),
         html.Div(
             [
-                html.P("Plotted lines can be turned on or off by clicking on the plot legend."),
-                html.P("Buttons near bottom of screen can be used to set the veiw to fixed perspectives."),
-                html.P("Graph can be zoomed and panned by interacting with it using the mouse and menu."),
-                html.P("Sliders near bottom of screen can be used to adjust variables used in the graph."),
+                html.H3("Overview"),
+                html.P(
+                    "This interactive plot is meant to be used for exploring The interactions of "
+                    + "variables in a three-phase system and the Clarke and Park transforms."
+                ),
+                html.H3("Introduction"),
+                html.P(
+                    "The Plotted lines can be turned on or off by clicking on the plot legend.  "
+                    + "The buttons below can be used to set the view to various fixed perspectives.  "
+                    + "The graph can be zoomed and panned by interacting with it using the mouse and menu.  "
+                    + "The sliders under the graph can be used to adjust variables used in the graph.  "
+                    + "The math below will update along with the graph to help better understant effects "
+                    + "that the sliders have on the graph"
+                ),
             ]
         ),
-        html.H4(
-            "If the math below does not render, try refreshing and/or force refreshing by pressing CTRL+F5."
+        html.H3("Equations"),
+        html.H5(
+            "If the math below does not render, try refreshing and/or force refreshing by pressing CTRL+F5.",
+            style={"color": "darkorange"},
         ),
         html.P("Three phase helix data."),
         html.Table(
@@ -804,6 +855,7 @@ app.layout = dbc.Container(
                 ]
             )
         ),
+        html.H3("View"),
         html.Div(
             [
                 html.P("Use the following controls to change the perspective of the graph."),
@@ -826,12 +878,14 @@ app.layout = dbc.Container(
                 "justify-content": "left",
             },
         ),
+        html.H3("Graph"),
         dcc.Graph(
             id="scatter_plot",
             style={
                 "scene_aspectmode": "cube",
             },
         ),
+        html.H3("Controls"),
         html.P(
             [
                 html.P("Use this slider to adjust the time axis by adding an " + "offset from zero to one."),
@@ -839,6 +893,7 @@ app.layout = dbc.Container(
                     id="time_slider",
                     min=0,
                     max=1,
+                    marks={0: "0", 1: "1"},
                     step=1 / cpe.slider_count,
                     value=0,
                     updatemode="drag",
@@ -852,6 +907,7 @@ app.layout = dbc.Container(
                     id="frequency_slider",
                     min=0.5,
                     max=5,
+                    marks={0.5: "0.5", 5: "5"},
                     step=1 / cpe.slider_count,
                     value=1,
                     updatemode="drag",
@@ -865,11 +921,12 @@ app.layout = dbc.Container(
                         [
                             html.Td(
                                 [
-                                    html.P("This slider controls Phase the amplitude of A."),
+                                    html.P("This slider controls the amplitude of Phase A."),
                                     dcc.Slider(
                                         id="phaseA_amplitude_slider",
                                         min=0.1,
                                         max=2,
+                                        marks={0.1: "0.1", 2: "2"},
                                         step=1 / cpe.slider_count,
                                         value=1,
                                         updatemode="drag",
@@ -887,6 +944,7 @@ app.layout = dbc.Container(
                                         id="phaseB_amplitude_slider",
                                         min=0.1,
                                         max=2,
+                                        marks={0.1: "0.1", 2: "2"},
                                         step=1 / cpe.slider_count,
                                         value=1,
                                         updatemode="drag",
@@ -904,6 +962,7 @@ app.layout = dbc.Container(
                                         id="phaseC_amplitude_slider",
                                         min=0.1,
                                         max=2,
+                                        marks={0.1: "0.1", 2: "2"},
                                         step=1 / cpe.slider_count,
                                         value=1,
                                         updatemode="drag",
@@ -928,6 +987,7 @@ app.layout = dbc.Container(
                                         id="phaseA_phase_slider",
                                         min=-1,
                                         max=1,
+                                        marks={-1: "-1", 1: "1"},
                                         step=1 / cpe.slider_count,
                                         value=0,
                                         updatemode="drag",
@@ -945,6 +1005,7 @@ app.layout = dbc.Container(
                                         id="phaseB_phase_slider",
                                         min=-1,
                                         max=1,
+                                        marks={-1: "-1", 1: "1"},
                                         step=1 / cpe.slider_count,
                                         value=0,
                                         updatemode="drag",
@@ -962,6 +1023,7 @@ app.layout = dbc.Container(
                                         id="phaseC_phase_slider",
                                         min=-1,
                                         max=1,
+                                        marks={-1: "-1", 1: "1"},
                                         step=1 / cpe.slider_count,
                                         value=0,
                                         updatemode="drag",
@@ -981,6 +1043,7 @@ app.layout = dbc.Container(
                     id="size_slider",
                     min=400,
                     max=1600,
+                    marks={400: "400", 1600: "1600"},
                     step=cpe.slider_count,
                     value=700,
                     updatemode="drag",
@@ -989,10 +1052,32 @@ app.layout = dbc.Container(
                         "always_visible": True,
                     },
                 ),
+                html.P(id="ignore"),
             ]
         ),
     ],
 )
+app.clientside_callback(
+    ClientsideFunction(namespace="clientside", function_name="mathjax_call"),
+    Output("ignore", "children"),
+    Input("time_slider", "value"),
+    Input("frequency_slider", "value"),
+    Input("phaseA_amplitude_slider", "value"),
+    Input("phaseB_amplitude_slider", "value"),
+    Input("phaseC_amplitude_slider", "value"),
+    Input("phaseA_phase_slider", "value"),
+    Input("phaseB_phase_slider", "value"),
+    Input("phaseC_phase_slider", "value"),
+    Input("size_slider", "value"),
+    Input("focus_xy", "n_clicks"),
+    Input("focus_xz", "n_clicks"),
+    Input("focus_yz", "n_clicks"),
+    Input("focus_corner", "n_clicks"),
+    Input("projection", "on"),
+)
 
 
-app.run_server(debug=True)
+if DEBUG is True:
+    app.run_server(debug=True)
+else:
+    app.run_server("0.0.0.0", 8050)

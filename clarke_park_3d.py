@@ -994,13 +994,26 @@ app.layout = dbc.Container(
             )
         ),
         html.P(),
-        html.Div(
-            [
-                html.Button("View X/Y (real / cosine)", id="focus_xy", n_clicks=0),
-                html.Button("View X/Z (imaginary / sine)", id="focus_xz", n_clicks=0),
-                html.Button("View Y/Z (polar)", id="focus_yz", n_clicks=0),
-                html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
-            ]
+        html.Table(
+            html.Tr(
+                [
+                    html.Td(
+                        html.Button("View X/Y (real / cosine)", id="focus_xy", n_clicks=0),
+                    ),
+                    html.Td("\u00A0\u00A0"),
+                    html.Td(
+                        html.Button("View X/Z (imaginary / sine)", id="focus_xz", n_clicks=0),
+                    ),
+                    html.Td("\u00A0\u00A0"),
+                    html.Td(
+                        html.Button("View Y/Z (polar)", id="focus_yz", n_clicks=0),
+                    ),
+                    html.Td("\u00A0\u00A0"),
+                    html.Td(
+                        html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
+                    ),
+                ]
+            )
         ),
         html.P(),
         html.H3("Graph"),

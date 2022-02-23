@@ -10,19 +10,44 @@ This repository is meant to hold example code for interacting with these equatio
 
 #### Get Started ####
 
-1. Install requirements
+1. Docker Method
 
-    ```bash
-    python -m pip install -r requirements.txt
-    ```
+    1. Build then Run
 
-1. Run python3 script
+        1. In two steps
 
-    ```bash
-    python clarke_park_3d.py
-    ```
+            ```bash
+            docker build -t clarke_park .
+            docker run -d -p 8050:8050 --name run_clarke_park clarke_park
+            ```
 
-1. Open a browser to [http://localhost:8050](http://localhost:8050)
+        1. Docker One-liner
+
+            ```bash
+            docker run -d -p 8050:8050 --name run_clarke_park $(docker build -q -t clarke_park .)
+            ```
+
+    1. Open a browser
+
+        go to [http://localhost:8050](http://localhost:8080)
+
+1. Python Method
+
+    1. Install requirements
+
+        ```bash
+        python -m pip install -r requirements.txt
+        ```
+
+    1. Run python3 script
+
+        ```bash
+        python clarke_park_3d.py
+        ```
+
+    1. Open a browser
+
+        go to [http://localhost:8050](http://localhost:8050)
 
 #### View Equations ####
 

@@ -880,6 +880,13 @@ class ClarkeParkExploration:
                             html.Td(f"{self.three_phase_data[PhaseEnum.C, AxisEnum.Z, 0]:0.2f}\u00A0\u00A0"),
                         ]
                     ),
+                    html.Tr(
+                        [
+                            html.Td(f"{self.three_phase_data[PhaseEnum.N, AxisEnum.X, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.N, AxisEnum.Y, 0]:0.2f}\u00A0\u00A0"),
+                            html.Td(f"{self.three_phase_data[PhaseEnum.N, AxisEnum.Z, 0]:0.2f}\u00A0\u00A0"),
+                        ]
+                    ),
                 ]
             ),
             html.Td(
@@ -955,13 +962,18 @@ app.layout = dbc.Container(
                 [
                     html.Td(
                         [
-                            html.P("Three phase helix data."),
+                            html.P("Three phase helix data (plus vector sum of the three)."),
                             html.P(
-                                "$$ \\begin{bmatrix}  A_x(t) & A_y(t) & A_z(t) \\\\ B_x(t) & B_y(t) & B_z(t) "
-                                + "\\\\ C_x(t) & C_y(t) & C_z(t)  \\end{bmatrix} = "
-                                + "\\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & "
-                                + "cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & "
-                                + "cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} $$"
+                                "$$ \\begin{bmatrix} "
+                                + "A_x(t) & A_y(t) & A_z(t) \\\\"
+                                + "B_x(t) & B_y(t) & B_z(t) \\\\"
+                                + "C_x(t) & C_y(t) & C_z(t) \\\\"
+                                + "N_x(t) & N_y(t) & N_z(t) \\end{bmatrix} = "
+                                + "\\begin{bmatrix} "
+                                + "x(t) & sin(t) & cos(t) \\\\"
+                                + "x(t) & sin(t+\\frac{2*\\pi}{3})) & cos(t+\\frac{2*\\pi}{3}) \\\\"
+                                + "x(t) & sin(t-\\frac{2*\\pi}{3}) & cos(t-\\frac{2*\\pi}{3}) \\\\"
+                                + "x(t) & A_y(t) + B_y(t) + C_y(t) & A_z(t) + B_z(t) + C_z(t) \\end{bmatrix} $$"
                             ),
                         ]
                     ),
@@ -972,9 +984,10 @@ app.layout = dbc.Container(
                                 "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 For t = time slider below."
                             ),
                             html.P(
-                                "$$ \\begin{bmatrix}  A_x(slider) & A_y(slider) & A_z(slider) \\\\ "
-                                + "B_x(slider) & B_y(slider) & B_z(slider) \\\\ C_x(slider) & "
-                                + "C_y(slider) & C_z(slider) \\end{bmatrix} = $$"
+                                "$$ \\begin{bmatrix}  A_x(slider) & A_y(slider) & A_z(slider) \\\\"
+                                + "B_x(slider) & B_y(slider) & B_z(slider) \\\\"
+                                + "C_x(slider) & C_y(slider) & C_z(slider) \\\\"
+                                + "N_x(slider) & N_y(slider) & N_z(slider) \\end{bmatrix} = $$"
                             ),
                         ]
                     ),

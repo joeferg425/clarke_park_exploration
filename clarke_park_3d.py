@@ -36,6 +36,7 @@ class PhaseEnum(IntEnum):
     A = 0
     B = 1
     C = 2
+    N = 3
 
 
 class ClarkeEnum(IntEnum):
@@ -72,6 +73,7 @@ class ColorEnum(Enum):
     PhaseA = "#E69F00"
     PhaseB = "#0072B2"
     PhaseC = "#CC79A7"
+    PhaseN = "#DDDDDD"
     ClarkeA = "#D55E00"
     ClarkeB = "#56B4E9"
     ClarkeZ = "#22CC22"
@@ -157,7 +159,7 @@ class ClarkeParkExploration:
         self.frequency: float = 1.0
         self.sample_count: int = 100
         self.slider_count: int = 100
-        self.three_phase_data: np.ndarray = np.ones((PHASE_COUNT, AXIS_COUNT, self.sample_count))
+        self.three_phase_data: np.ndarray = np.ones((PHASE_COUNT + 1, AXIS_COUNT, self.sample_count))
         self.three_phase_data[:, :] *= np.linspace(0, 1, self.sample_count)
         self.clarke_data: np.ndarray = np.ones((PHASE_COUNT, self.sample_count))
         self.park_data: np.ndarray = np.ones((AXIS_COUNT, self.sample_count))
@@ -167,6 +169,7 @@ class ClarkeParkExploration:
         self.ones3 = np.zeros((3, self.sample_count))
         self.height = 800
         self.width = self.height * 1.25
+        self.zero_sequence = 0.0
         self.projection = ""
         self.projection_label = ""
         self.run_mode = ""
@@ -227,18 +230,37 @@ class ClarkeParkExploration:
             self.frequency * TWO_PI * self.time_plus_offset + (self.phaseA_offset * np.pi)
         )
 
-        self.three_phase_data[PhaseEnum.B, AxisEnum.Y, :] = self.phaseB_amplitude * np.cos(
-            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseB_offset * np.pi) - _120
+        self.three_phase_data[PhaseEnum.B, AxisEnum.Y, :] = (
+            self.phaseB_amplitude
+            * np.cos(self.frequency * TWO_PI * self.time_plus_offset + (self.phaseB_offset * np.pi) - _120)
+            - np.cos(_120) * self.zero_sequence
         )
-        self.three_phase_data[PhaseEnum.B, AxisEnum.Z, :] = self.phaseB_amplitude * np.sin(
-            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseB_offset * np.pi) - _120
+        self.three_phase_data[PhaseEnum.B, AxisEnum.Z, :] = (
+            self.phaseB_amplitude
+            * np.sin(self.frequency * TWO_PI * self.time_plus_offset + (self.phaseB_offset * np.pi) - _120)
+            - np.sin(_120) * self.zero_sequence
         )
 
-        self.three_phase_data[PhaseEnum.C, AxisEnum.Y, :] = self.phaseC_amplitude * np.cos(
-            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseC_offset * np.pi) + _120
+        self.three_phase_data[PhaseEnum.C, AxisEnum.Y, :] = (
+            self.phaseC_amplitude
+            * np.cos(self.frequency * TWO_PI * self.time_plus_offset + (self.phaseC_offset * np.pi) + _120)
+            - np.cos(_240) * self.zero_sequence
         )
-        self.three_phase_data[PhaseEnum.C, AxisEnum.Z, :] = self.phaseC_amplitude * np.sin(
-            self.frequency * TWO_PI * self.time_plus_offset + (self.phaseC_offset * np.pi) + _120
+        self.three_phase_data[PhaseEnum.C, AxisEnum.Z, :] = (
+            self.phaseC_amplitude
+            * np.sin(self.frequency * TWO_PI * self.time_plus_offset + (self.phaseC_offset * np.pi) + _120)
+            - np.sin(_240) * self.zero_sequence
+        )
+
+        self.three_phase_data[PhaseEnum.N, AxisEnum.Y, :] = (
+            self.three_phase_data[PhaseEnum.A, AxisEnum.Y, :]
+            + self.three_phase_data[PhaseEnum.B, AxisEnum.Y, :]
+            + self.three_phase_data[PhaseEnum.C, AxisEnum.Y, :]
+        )
+        self.three_phase_data[PhaseEnum.N, AxisEnum.Z, :] = (
+            self.three_phase_data[PhaseEnum.A, AxisEnum.Z, :]
+            + self.three_phase_data[PhaseEnum.B, AxisEnum.Z, :]
+            + self.three_phase_data[PhaseEnum.C, AxisEnum.Z, :]
         )
 
     def do_clarke_transform(self):
@@ -283,12 +305,20 @@ class ClarkeParkExploration:
         self.generate_three_phase_data()
         self.do_clarke_transform()
         self.do_park_transform()
+        mmax1 = np.max(self.three_phase_data)
+        mmax2 = np.max(self.clarke_data)
+        mmax3 = np.max(self.park_data)
+        mmin1 = np.min(self.three_phase_data)
+        mmin2 = np.min(self.clarke_data)
+        mmin3 = np.min(self.park_data)
+        mmax = np.max([mmax1, mmax2, mmax3, -mmin1, -mmin2, -mmin3])
+        ticks = [-mmax, mmax]
         self.figure_data = {
             "data": [
                 {
                     "x": [0, 1],
-                    "y": [-1, 1],
-                    "z": [-1, 1],
+                    "y": ticks,
+                    "z": ticks,
                     "type": "scatter3d",
                     "mode": "lines",
                     "name": "fixed_xyz_range",
@@ -337,6 +367,19 @@ class ClarkeParkExploration:
                     },
                 },
                 {
+                    "x": self.three_phase_data[PhaseEnum.N, AxisEnum.X, :],
+                    "y": self.three_phase_data[PhaseEnum.N, AxisEnum.Y, :],
+                    "z": self.three_phase_data[PhaseEnum.N, AxisEnum.Z, :],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": "Neutral (t)",
+                    "line": {
+                        "width": WidthEnum.Time.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseN.value,
+                    },
+                },
+                {
                     "x": [0, 0],
                     "y": [
                         0,
@@ -348,7 +391,7 @@ class ClarkeParkExploration:
                     ],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Phasor A",
+                    "name": f"Phase A({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Phasor.value,
                         "dash": DashEnum.Normal.value,
@@ -367,7 +410,7 @@ class ClarkeParkExploration:
                     ],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Phasor B",
+                    "name": f"Phase B({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Phasor.value,
                         "dash": DashEnum.Normal.value,
@@ -386,11 +429,30 @@ class ClarkeParkExploration:
                     ],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Phasor C",
+                    "name": f"Phase C({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Phasor.value,
                         "dash": DashEnum.Normal.value,
                         "color": ColorEnum.PhaseC.value,
+                    },
+                },
+                {
+                    "x": [0, 0],
+                    "y": [
+                        0,
+                        self.three_phase_data[PhaseEnum.N, AxisEnum.Y, 0],
+                    ],
+                    "z": [
+                        0,
+                        self.three_phase_data[PhaseEnum.N, AxisEnum.Z, 0],
+                    ],
+                    "type": "scatter3d",
+                    "mode": "lines",
+                    "name": f"Neutral ({self.time_offset:0.2f})",
+                    "line": {
+                        "width": WidthEnum.Clarke.value,
+                        "dash": DashEnum.Normal.value,
+                        "color": ColorEnum.PhaseN.value,
                     },
                 },
                 {
@@ -438,7 +500,7 @@ class ClarkeParkExploration:
                     "z": [0, 0],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Clarke α",
+                    "name": f"Clarke α ({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Clarke.value,
                         "dash": DashEnum.Clarke.value,
@@ -451,7 +513,7 @@ class ClarkeParkExploration:
                     "z": [0, self.clarke_data[ClarkeEnum.B, 0]],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Clarke β",
+                    "name": f"Clarke β ({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Clarke.value,
                         "dash": DashEnum.Clarke.value,
@@ -464,7 +526,7 @@ class ClarkeParkExploration:
                     "z": [0, self.clarke_data[ClarkeEnum.Z, 0]],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Clarke Zero ",
+                    "name": f"Clarke Zero ({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Time.value,
                         "dash": DashEnum.Clarke.value,
@@ -535,7 +597,7 @@ class ClarkeParkExploration:
                     ],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Park d",
+                    "name": f"Park d ({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Park.value,
                         "dash": DashEnum.Park.value,
@@ -560,7 +622,7 @@ class ClarkeParkExploration:
                     ],
                     "type": "scatter3d",
                     "mode": "lines",
-                    "name": "Park q",
+                    "name": f"Park q ({self.time_offset:0.2f})",
                     "line": {
                         "width": WidthEnum.Park.value,
                         "dash": DashEnum.Park.value,
@@ -702,6 +764,7 @@ class ClarkeParkExploration:
             Input("phaseB_phase_slider", "value"),
             Input("phaseC_phase_slider", "value"),
             Input("size_slider", "value"),
+            Input("zerosequence_slider", "value"),
             Input("focus_xy", "n_clicks"),
             Input("focus_xz", "n_clicks"),
             Input("focus_yz", "n_clicks"),
@@ -721,6 +784,7 @@ class ClarkeParkExploration:
         phaseB_phase_slider,
         phaseC_phase_slider,
         size_slider,
+        zero_sequence_slider,
         btn1,
         btn2,
         btn3,
@@ -762,6 +826,7 @@ class ClarkeParkExploration:
         self.phaseC_amplitude = phaseC_amplitude_slider
         self.height = size_slider
         self.width = size_slider * 1.25
+        self.zero_sequence = zero_sequence_slider
         if projection_isometric is False:
             self.projection = "isometric"
             self.projection_label = "Enable Orthographic Projection"
@@ -1190,6 +1255,20 @@ app.layout = dbc.Container(
                         "always_visible": True,
                     },
                 ),
+                html.P("This slider adds a DC offset to phases B & C."),
+                dcc.Slider(
+                    id="zerosequence_slider",
+                    min=0.0,
+                    max=1.0,
+                    marks={0: "0", 1: "1"},
+                    step=1.0 / cpe.slider_count,
+                    value=0,
+                    updatemode="drag",
+                    tooltip={
+                        "placement": "bottom",
+                        "always_visible": True,
+                    },
+                ),
                 html.P(id="ignore"),
                 dcc.Interval(id="interval-component", interval=250, n_intervals=0, max_intervals=0),
             ]
@@ -1208,6 +1287,7 @@ app.clientside_callback(
     Input("phaseB_phase_slider", "value"),
     Input("phaseC_phase_slider", "value"),
     Input("size_slider", "value"),
+    Input("zerosequence_slider", "value"),
     Input("focus_xy", "n_clicks"),
     Input("focus_xz", "n_clicks"),
     Input("focus_yz", "n_clicks"),

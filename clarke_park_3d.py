@@ -950,20 +950,20 @@ app.layout = dbc.Container(
             ]
         ),
         html.H3("Equations"),
-        html.H5(
-            "If the math below does not render, try refreshing and/or force refreshing by pressing CTRL+F5.",
-            style={"color": "darkorange"},
-        ),
-        html.P("Three phase helix data."),
         html.Table(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\begin{bmatrix}  A_x(t) & A_y(t) & A_z(t) \\\\ B_x(t) & B_y(t) & B_z(t) "
-                        + "\\\\ C_x(t) & C_y(t) & C_z(t)  \\end{bmatrix} = "
-                        + "\\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & "
-                        + "cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & "
-                        + "cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} $$"
+                        [
+                            html.P("Three phase helix data."),
+                            html.P(
+                                "$$ \\begin{bmatrix}  A_x(t) & A_y(t) & A_z(t) \\\\ B_x(t) & B_y(t) & B_z(t) "
+                                + "\\\\ C_x(t) & C_y(t) & C_z(t)  \\end{bmatrix} = "
+                                + "\\begin{bmatrix}  x(t) & sin(t) & cos(t) \\\\ x(t) & sin(t+\\frac{2*\\pi}{3})) & "
+                                + "cos(t+\\frac{2*\\pi}{3}) \\\\ x(t) & sin(t-\\frac{2*\\pi}{3}) & "
+                                + "cos(t-\\frac{2*\\pi}{3})  \\end{bmatrix} $$"
+                            ),
+                        ]
                     ),
                     html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
                     html.Td(
@@ -982,16 +982,20 @@ app.layout = dbc.Container(
                 ]
             )
         ),
-        html.P("Clarke transform data."),
         html.Table(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} "
-                        + "\\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ "
-                        + "\\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix} "
-                        + " \\begin{bmatrix} A_z(t) \\\\ B_z(t) \\\\ C_z(t) \\end{bmatrix} ="
-                        + " \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
+                        [
+                            html.P("Clarke transform data."),
+                            html.P(
+                                "$$ \\frac{2}{3} \\begin{bmatrix} 1 & -\\frac{1}{2} & -\\frac{1}{2} "
+                                + "\\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ "
+                                + "\\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix} "
+                                + " \\begin{bmatrix} A_z(t) \\\\ B_z(t) \\\\ C_z(t) \\end{bmatrix} ="
+                                + " \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
+                            ),
+                        ]
                     ),
                     html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
                     html.Td(
@@ -1009,15 +1013,19 @@ app.layout = dbc.Container(
                 ]
             )
         ),
-        html.P("Park Transform data."),
         html.Table(
             html.Tr(
                 [
                     html.Td(
-                        "$$ \\begin{bmatrix} sin(\\omega t) & -cos(\\omega t) & 0 \\\\ "
-                        + "cos(\\omega t) & sin(\\omega t) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} "
-                        + " \\begin{bmatrix} \\alpha(t) \\\\ \\beta(t) \\\\ Z_{C}(t) \\end{bmatrix} = "
-                        + "\\begin{bmatrix} d(t) \\\\ q(t) \\\\ Z_{P}(t) \\end{bmatrix} $$"
+                        [
+                            html.P("Park Transform data."),
+                            html.P(
+                                "$$ \\begin{bmatrix} sin(\\omega t) & -cos(\\omega t) & 0 \\\\ "
+                                + "cos(\\omega t) & sin(\\omega t) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} "
+                                + " \\begin{bmatrix} \\alpha(t) \\\\ \\beta(t) \\\\ Z_{C}(t) \\end{bmatrix} = "
+                                + "\\begin{bmatrix} d(t) \\\\ q(t) \\\\ Z_{P}(t) \\end{bmatrix} $$"
+                            ),
+                        ]
                     ),
                     html.Td("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
                     html.Td(
@@ -1035,248 +1043,274 @@ app.layout = dbc.Container(
                 ]
             )
         ),
-        html.H3("View"),
-        html.Div(
-            [
-                html.P("Use the following controls to change the perspective of the graph."),
-                html.P("Sometimes you have to switch views more than once for plotly to reset any rotation."),
-            ]
-        ),
         html.Table(
             html.Tr(
                 [
                     html.Td(
-                        daq.BooleanSwitch(
-                            id="projection", on=False, label="Isometric Projection", labelPosition="top"
-                        ),
-                    ),
-                    html.Td(
-                        html.P("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
-                    ),
-                    html.Td(
-                        daq.BooleanSwitch(
-                            id="run-mode", on=False, label="Enable Continuous Mode", labelPosition="top"
-                        ),
-                    ),
-                ]
-            )
-        ),
-        html.P(),
-        html.Table(
-            html.Tr(
-                [
-                    html.Td(
-                        html.Button("View X/Y (real / cosine)", id="focus_xy", n_clicks=0),
-                    ),
-                    html.Td("\u00A0\u00A0"),
-                    html.Td(
-                        html.Button("View X/Z (imaginary / sine)", id="focus_xz", n_clicks=0),
-                    ),
-                    html.Td("\u00A0\u00A0"),
-                    html.Td(
-                        html.Button("View Y/Z (polar)", id="focus_yz", n_clicks=0),
-                    ),
-                    html.Td("\u00A0\u00A0"),
-                    html.Td(
-                        html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
-                    ),
-                ]
-            )
-        ),
-        html.P(),
-        html.H3("Graph"),
-        dcc.Graph(
-            id="scatter_plot",
-            style={
-                "scene_aspectmode": "cube",
-            },
-        ),
-        html.H3("Controls"),
-        html.P(
-            [
-                html.P("Use this slider to adjust the time axis by adding an " + "offset from zero to one."),
-                dcc.Slider(
-                    id="time_slider",
-                    min=0,
-                    max=1,
-                    marks={0: "0", 1: "1"},
-                    step=1 / cpe.slider_count,
-                    value=0,
-                    updatemode="drag",
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.P("This slider adjusts the frequency of the sine waves (\\(  \\omega \\) )."),
-                dcc.Slider(
-                    id="frequency_slider",
-                    min=0.5,
-                    max=5,
-                    marks={0.5: "0.5", 5: "5"},
-                    step=1 / cpe.slider_count,
-                    value=1,
-                    updatemode="drag",
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.Table(
-                    html.Tr(
                         [
-                            html.Td(
+                            html.H3("View"),
+                            html.Div(
                                 [
-                                    html.P("This slider controls the amplitude of Phase A."),
-                                    dcc.Slider(
-                                        id="phaseA_amplitude_slider",
-                                        min=0.1,
-                                        max=2,
-                                        marks={0.1: "0.1", 2: "2"},
-                                        step=1 / cpe.slider_count,
-                                        value=1,
-                                        updatemode="drag",
-                                        tooltip={
-                                            "placement": "bottom",
-                                            "always_visible": True,
-                                        },
+                                    html.P(
+                                        "Use the following controls to change the perspective of the graph."
+                                    ),
+                                    html.P(
+                                        "Sometimes you have to switch views more than once for plotly to reset any rotation."
                                     ),
                                 ]
                             ),
-                            html.Td(
-                                [
-                                    html.P("This slider controls the amplitude of Phase B."),
-                                    dcc.Slider(
-                                        id="phaseB_amplitude_slider",
-                                        min=0.1,
-                                        max=2,
-                                        marks={0.1: "0.1", 2: "2"},
-                                        step=1 / cpe.slider_count,
-                                        value=1,
-                                        updatemode="drag",
-                                        tooltip={
-                                            "placement": "bottom",
-                                            "always_visible": True,
-                                        },
-                                    ),
-                                ]
+                            html.Table(
+                                html.Tr(
+                                    [
+                                        html.Td(
+                                            daq.BooleanSwitch(
+                                                id="projection",
+                                                on=False,
+                                                label="Isometric Projection",
+                                                labelPosition="top",
+                                            ),
+                                        ),
+                                        html.Td(
+                                            html.P("\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"),
+                                        ),
+                                        html.Td(
+                                            daq.BooleanSwitch(
+                                                id="run-mode",
+                                                on=False,
+                                                label="Enable Continuous Mode",
+                                                labelPosition="top",
+                                            ),
+                                        ),
+                                    ]
+                                )
                             ),
-                            html.Td(
-                                [
-                                    html.P("This slider controls the amplitude of Phase C."),
-                                    dcc.Slider(
-                                        id="phaseC_amplitude_slider",
-                                        min=0.1,
-                                        max=2,
-                                        marks={0.1: "0.1", 2: "2"},
-                                        step=1 / cpe.slider_count,
-                                        value=1,
-                                        updatemode="drag",
-                                        tooltip={
-                                            "placement": "bottom",
-                                            "always_visible": True,
-                                        },
-                                    ),
-                                ]
+                            html.P(),
+                            html.Table(
+                                html.Tr(
+                                    [
+                                        html.Td(
+                                            html.Button(
+                                                "View X/Y (real / cosine)", id="focus_xy", n_clicks=0
+                                            ),
+                                        ),
+                                        html.Td("\u00A0\u00A0"),
+                                        html.Td(
+                                            html.Button(
+                                                "View X/Z (imaginary / sine)", id="focus_xz", n_clicks=0
+                                            ),
+                                        ),
+                                        html.Td("\u00A0\u00A0"),
+                                        html.Td(
+                                            html.Button("View Y/Z (polar)", id="focus_yz", n_clicks=0),
+                                        ),
+                                        html.Td("\u00A0\u00A0"),
+                                        html.Td(
+                                            html.Button("View X/Y/Z", id="focus_corner", n_clicks=0),
+                                        ),
+                                    ]
+                                )
+                            ),
+                            html.P(),
+                            html.H3("Controls"),
+                            html.P("Time offset"),
+                            dcc.Slider(
+                                id="time_slider",
+                                min=0,
+                                max=1,
+                                marks={0: "0", 1: "1"},
+                                step=1 / cpe.slider_count,
+                                value=0,
+                                updatemode="drag",
+                                tooltip={
+                                    "placement": "bottom",
+                                    "always_visible": True,
+                                },
+                            ),
+                            html.P("Frequency (\\(  \\omega \\))."),
+                            dcc.Slider(
+                                id="frequency_slider",
+                                min=0.5,
+                                max=5,
+                                marks={0.5: "0.5", 5: "5"},
+                                step=1 / cpe.slider_count,
+                                value=1,
+                                updatemode="drag",
+                                tooltip={
+                                    "placement": "bottom",
+                                    "always_visible": True,
+                                },
+                            ),
+                            html.Table(
+                                html.Tr(
+                                    [
+                                        html.Td(
+                                            [
+                                                html.P("A amplitude"),
+                                                dcc.Slider(
+                                                    id="phaseA_amplitude_slider",
+                                                    min=0.1,
+                                                    max=2,
+                                                    marks={0.1: "0.1", 2: "2"},
+                                                    step=1 / cpe.slider_count,
+                                                    value=1,
+                                                    updatemode="drag",
+                                                    tooltip={
+                                                        "placement": "bottom",
+                                                        "always_visible": True,
+                                                    },
+                                                ),
+                                            ]
+                                        ),
+                                        html.Td(
+                                            [
+                                                html.P("B amplitude"),
+                                                dcc.Slider(
+                                                    id="phaseB_amplitude_slider",
+                                                    min=0.1,
+                                                    max=2,
+                                                    marks={0.1: "0.1", 2: "2"},
+                                                    step=1 / cpe.slider_count,
+                                                    value=1,
+                                                    updatemode="drag",
+                                                    tooltip={
+                                                        "placement": "bottom",
+                                                        "always_visible": True,
+                                                    },
+                                                ),
+                                            ]
+                                        ),
+                                        html.Td(
+                                            [
+                                                html.P("C amplitude"),
+                                                dcc.Slider(
+                                                    id="phaseC_amplitude_slider",
+                                                    min=0.1,
+                                                    max=2,
+                                                    marks={0.1: "0.1", 2: "2"},
+                                                    step=1 / cpe.slider_count,
+                                                    value=1,
+                                                    updatemode="drag",
+                                                    tooltip={
+                                                        "placement": "bottom",
+                                                        "always_visible": True,
+                                                    },
+                                                ),
+                                            ]
+                                        ),
+                                    ],
+                                ),
+                                style={"width": "100%"},
+                            ),
+                            html.Table(
+                                html.Tr(
+                                    [
+                                        html.Td(
+                                            [
+                                                html.P("A phase offset"),
+                                                dcc.Slider(
+                                                    id="phaseA_phase_slider",
+                                                    min=-1,
+                                                    max=1,
+                                                    marks={-1: "-1", 1: "1"},
+                                                    step=1 / cpe.slider_count,
+                                                    value=0,
+                                                    updatemode="drag",
+                                                    tooltip={
+                                                        "placement": "bottom",
+                                                        "always_visible": True,
+                                                    },
+                                                ),
+                                            ]
+                                        ),
+                                        html.Td(
+                                            [
+                                                html.P("B phase offset"),
+                                                dcc.Slider(
+                                                    id="phaseB_phase_slider",
+                                                    min=-1,
+                                                    max=1,
+                                                    marks={-1: "-1", 1: "1"},
+                                                    step=1 / cpe.slider_count,
+                                                    value=0,
+                                                    updatemode="drag",
+                                                    tooltip={
+                                                        "placement": "bottom",
+                                                        "always_visible": True,
+                                                    },
+                                                ),
+                                            ]
+                                        ),
+                                        html.Td(
+                                            [
+                                                html.P("C phase offset"),
+                                                dcc.Slider(
+                                                    id="phaseC_phase_slider",
+                                                    min=-1,
+                                                    max=1,
+                                                    marks={-1: "-1", 1: "1"},
+                                                    step=1 / cpe.slider_count,
+                                                    value=0,
+                                                    updatemode="drag",
+                                                    tooltip={
+                                                        "placement": "bottom",
+                                                        "always_visible": True,
+                                                    },
+                                                ),
+                                            ]
+                                        ),
+                                    ],
+                                ),
+                                style={"width": "100%"},
+                            ),
+                            html.P("DC offset"),
+                            dcc.Slider(
+                                id="zerosequence_slider",
+                                min=0.0,
+                                max=1.0,
+                                marks={0: "0", 1: "1"},
+                                step=1.0 / cpe.slider_count,
+                                value=0,
+                                updatemode="drag",
+                                tooltip={
+                                    "placement": "bottom",
+                                    "always_visible": True,
+                                },
+                            ),
+                            html.P("Graph size"),
+                            dcc.Slider(
+                                id="size_slider",
+                                min=400,
+                                max=1600,
+                                marks={400: "400", 1600: "1600"},
+                                step=cpe.slider_count,
+                                value=700,
+                                updatemode="drag",
+                                tooltip={
+                                    "placement": "bottom",
+                                    "always_visible": True,
+                                },
                             ),
                         ],
+                        style={"width": "40%"},
                     ),
-                    style={"width": "100%"},
-                ),
-                html.Table(
-                    html.Tr(
+                    html.Td(
                         [
-                            html.Td(
-                                [
-                                    html.P("This slider adds a phase offset to Phase A."),
-                                    dcc.Slider(
-                                        id="phaseA_phase_slider",
-                                        min=-1,
-                                        max=1,
-                                        marks={-1: "-1", 1: "1"},
-                                        step=1 / cpe.slider_count,
-                                        value=0,
-                                        updatemode="drag",
-                                        tooltip={
-                                            "placement": "bottom",
-                                            "always_visible": True,
-                                        },
-                                    ),
-                                ]
-                            ),
-                            html.Td(
-                                [
-                                    html.P("This slider adds a phase offset to Phase B."),
-                                    dcc.Slider(
-                                        id="phaseB_phase_slider",
-                                        min=-1,
-                                        max=1,
-                                        marks={-1: "-1", 1: "1"},
-                                        step=1 / cpe.slider_count,
-                                        value=0,
-                                        updatemode="drag",
-                                        tooltip={
-                                            "placement": "bottom",
-                                            "always_visible": True,
-                                        },
-                                    ),
-                                ]
-                            ),
-                            html.Td(
-                                [
-                                    html.P("This slider adds a phase offset to Phase C."),
-                                    dcc.Slider(
-                                        id="phaseC_phase_slider",
-                                        min=-1,
-                                        max=1,
-                                        marks={-1: "-1", 1: "1"},
-                                        step=1 / cpe.slider_count,
-                                        value=0,
-                                        updatemode="drag",
-                                        tooltip={
-                                            "placement": "bottom",
-                                            "always_visible": True,
-                                        },
-                                    ),
-                                ]
+                            dcc.Graph(
+                                id="scatter_plot",
+                                style={
+                                    "scene_aspectmode": "cube",
+                                },
                             ),
                         ]
                     ),
-                    style={"width": "100%"},
-                ),
-                html.P("This slider adjusts the size of the graphic."),
-                dcc.Slider(
-                    id="size_slider",
-                    min=400,
-                    max=1600,
-                    marks={400: "400", 1600: "1600"},
-                    step=cpe.slider_count,
-                    value=700,
-                    updatemode="drag",
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.P("This slider adds a DC offset to phases B & C."),
-                dcc.Slider(
-                    id="zerosequence_slider",
-                    min=0.0,
-                    max=1.0,
-                    marks={0: "0", 1: "1"},
-                    step=1.0 / cpe.slider_count,
-                    value=0,
-                    updatemode="drag",
-                    tooltip={
-                        "placement": "bottom",
-                        "always_visible": True,
-                    },
-                ),
-                html.P(id="ignore"),
-                dcc.Interval(id="interval-component", interval=250, n_intervals=0, max_intervals=0),
-            ]
+                ]
+            )
         ),
+        html.P(id="ignore"),
+        dcc.Interval(id="interval-component", interval=250, n_intervals=0, max_intervals=0),
     ],
+    style={"width": "100%"},
+    fluid=True,
 )
 app.clientside_callback(
     ClientsideFunction(namespace="clientside", function_name="mathjax_call"),

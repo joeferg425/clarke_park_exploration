@@ -808,6 +808,7 @@ class ClarkeParkExploration:
             phaseB_phase_slider: _description_
             phaseC_phase_slider: _description_
             size_slider: _description_
+            zero_sequence_slider: _description_
             btn1: _description_
             btn2: _description_
             btn3: _description_
@@ -973,7 +974,8 @@ app.layout = dbc.Container(
                                 + "x(t) & sin(t) & cos(t) \\\\"
                                 + "x(t) & sin(t+\\frac{2*\\pi}{3})) & cos(t+\\frac{2*\\pi}{3}) \\\\"
                                 + "x(t) & sin(t-\\frac{2*\\pi}{3}) & cos(t-\\frac{2*\\pi}{3}) \\\\"
-                                + "x(t) & A_y(t) + B_y(t) + C_y(t) & A_z(t) + B_z(t) + C_z(t) \\end{bmatrix} $$"
+                                + "x(t) & A_y(t) + B_y(t) + C_y(t) & A_z(t) + B_z(t) + C_z(t) "
+                                + "\\end{bmatrix} $$"
                             ),
                         ]
                     ),
@@ -1006,7 +1008,8 @@ app.layout = dbc.Container(
                                 + "\\\\ 0 & \\frac{\\sqrt{3}}{2} & -\\frac{\\sqrt{3}}{2} \\\\ "
                                 + "\\frac{1}{2} & \\frac{1}{2} & \\frac{1}{2} \\end{bmatrix} "
                                 + " \\begin{bmatrix} A_z(t) \\\\ B_z(t) \\\\ C_z(t) \\end{bmatrix} ="
-                                + " \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) \\end{bmatrix} $$"
+                                + " \\begin{bmatrix}  \\alpha(t) \\\\ \\beta(t)  \\\\ Z_{C}(t) "
+                                + "\\end{bmatrix} $$"
                             ),
                         ]
                     ),
@@ -1033,10 +1036,17 @@ app.layout = dbc.Container(
                         [
                             html.P("Park Transform data."),
                             html.P(
-                                "$$ \\begin{bmatrix} sin(\\omega t) & -cos(\\omega t) & 0 \\\\ "
-                                + "cos(\\omega t) & sin(\\omega t) & 0 \\\\ 0 & 0 & 1 \\end{bmatrix} "
-                                + " \\begin{bmatrix} \\alpha(t) \\\\ \\beta(t) \\\\ Z_{C}(t) \\end{bmatrix} = "
-                                + "\\begin{bmatrix} d(t) \\\\ q(t) \\\\ Z_{P}(t) \\end{bmatrix} $$"
+                                "$$ \\begin{bmatrix} "
+                                + "sin(\\omega t) & -cos(\\omega t) & 0 \\\\"
+                                + "cos(\\omega t) & sin(\\omega t) & 0 \\\\ "
+                                + "0 & 0 & 1 "
+                                + "\\end{bmatrix} "
+                                + "\\begin{bmatrix} "
+                                + "\\alpha(t) \\\\ \\beta(t) \\\\ Z_{C}(t) "
+                                + "\\end{bmatrix} = "
+                                + "\\begin{bmatrix} "
+                                + "d(t) \\\\ q(t) \\\\ Z_{P}(t) "
+                                + "\\end{bmatrix} $$"
                             ),
                         ]
                     ),
@@ -1068,7 +1078,7 @@ app.layout = dbc.Container(
                                         "Use the following controls to change the perspective of the graph."
                                     ),
                                     html.P(
-                                        "Sometimes you have to switch views more than once for plotly to reset any rotation."
+                                        "Sometimes you have to switch views more than once to reset rotation."
                                     ),
                                 ]
                             ),
